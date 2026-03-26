@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Delete Property - Rent&Stay{% endblock %}
+
+{% block content %}
+<section class="py-20 bg-gray-50 min-h-screen flex items-center">
+    <div class="max-w-md mx-auto px-4 w-full">
+        <div class="bg-white rounded-2xl shadow-lg p-8 text-center">
+            <svg class="h-16 w-16 text-red-500 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+            </svg>
+            <h2 class="text-2xl font-bold text-gray-900 mb-2">Delete Property?</h2>
+            <p class="text-gray-600 mb-6">
+                Are you sure you want to delete "<strong>{{ property.title }}</strong>"? This action cannot be undone.
+            </p>
+
+            <form method="post" class="inline">
+                {% csrf_token %}
+                <div class="flex justify-center space-x-4">
+                    <a href="{% url 'my_properties' %}" class="px-6 py-3 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition font-medium">
+                        Cancel
+                    </a>
+                    <button type="submit" class="px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition font-medium">
+                        Delete
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</section>
+{% endblock %}

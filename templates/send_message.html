@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Send Message - Rent&Stay{% endblock %}
+
+{% block content %}
+<div class="py-8 bg-gray-50 min-h-screen">
+    <div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
+        <!-- Header -->
+        <div class="mb-8">
+            <h1 class="text-3xl font-bold text-gray-900">Send Message</h1>
+            <p class="text-gray-600 mt-1">Compose a new message to another user</p>
+        </div>
+
+        <!-- Form -->
+        <div class="bg-white rounded-xl shadow p-6">
+            <form method="post" class="space-y-6">
+                {% csrf_token %}
+
+                <!-- Hidden fields for pre-selected receiver/property -->
+                {% if form.receiver.value %}
+                    <input type="hidden" name="receiver" value="{{ form.receiver.value|stringformat:'s' }}">
+                {% endif %}
+                {% if form.related_property.value %}
+                    <input type="hidden" name="related_property" value="{{ form.related_property.value|stringformat:'s' }}">
+                {% endif %}
+
+                {% if not form.receiver.value and not form.related_property.value %}
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Recipient</label>
+                        {{ form.receiver }}
+                        {% if form.receiver.errors %}
+                            <p class="mt-1 text-sm text-red-600">{{ form.receiver.errors }}</p>
+                        {% endif %}
+                    </div>
+                {% endif %}
+
+                {% if not form.related_property.value %}
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Related Property (optional)</label>
+                        {{ form.related_property }}
+                        <p class="mt-1 text-sm text-gray-500">Select a property if this message is about a specific listing</p>
+                        {% if form.related_property.errors %}
+                            <p class="mt-1 text-sm text-red-600">{{ form.related_property.errors }}</p>
+                        {% endif %}
+                    </div>
+                {% endif %}
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Subject</label>
+                    {{ form.subject }}
+                    {% if form.subject.errors %}
+                        <p class="mt-1 text-sm text-red-600">{{ form.subject.errors }}</p>
+                    {% endif %}
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Message</label>
+                    {{ form.body }}
+                    {% if form.body.errors %}
+                        <p class="mt-1 text-sm text-red-600">{{ form.body.errors }}</p>
+                    {% endif %}
+                </div>
+
+                <div class="flex justify-end gap-3">
+                    <a href="{% url 'inbox' %}" class="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition">
+                        Cancel
+                    </a>
+                    <button type="submit" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition font-medium">
+                        Send Message
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Tips -->
+        <div class="mt-6 bg-blue-50 border border-blue-200 rounded-xl p-4">
+            <h3 class="font-semibold text-blue-900 mb-2">Messaging Tips</h3>
+            <ul class="text-sm text-blue-800 space-y-1">
+                <li>• Be respectful and professional in your communications</li>
+                <li>• Include relevant details about the property or inquiry</li>
+                <li>• Avoid sharing personal contact information until you're comfortable</li>
+                <li>• Use this system to keep all your property-related conversations organized</li>
+            </ul>
+        </div>
+    </div>
+</div>
+{% endblock %}

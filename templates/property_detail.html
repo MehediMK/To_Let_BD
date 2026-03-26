@@ -1,0 +1,549 @@
+{% extends "base.html" %}
+{% load static %}
+{% load bd_filters %}
+
+{% block title %}{{ property.title }} - Rent&Stay{% endblock %}
+
+{% block extra_css %}
+<style>
+    .image-gallery {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1rem;
+    }
+    .gallery-image {
+        width: 100%;
+        height: 150px;
+        object-fit: cover;
+        border-radius: 0.5rem;
+        cursor: pointer;
+        transition: transform 0.2s;
+    }
+    .gallery-image:hover {
+        transform: scale(1.05);
+    }
+    .amenity-item {
+        display: flex;
+        align-items: center;
+        padding: 0.75rem;
+        background: #f3f4f6;
+        border-radius: 0.5rem;
+        margin-bottom: 0.5rem;
+    }
+    .amenity-icon {
+        margin-right: 0.75rem;
+        color: #3b82f6;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="py-12 bg-white">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <!-- Breadcrumb -->
+        <nav class="mb-8">
+            <ol class="flex items-center space-x-2 text-sm text-gray-500">
+                <li><a href="{% url 'home' %}" class="hover:text-blue-600">Home</a></li>
+                <li>/</li>
+                <li><a href="{% url 'search' %}?property_type={{ property.property_type }}" class="hover:text-blue-600">{{ property.get_property_type_display }}</a></li>
+                <li>/</li>
+                <li class="text-gray-900 font-medium">{{ property.title|truncatechars:30 }}</li>
+            </ol>
+        </nav>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <!-- Main Content -->
+            <div class="lg:col-span-2">
+                <!-- Main Image -->
+                <div class="mb-8 rounded-xl overflow-hidden shadow-lg">
+                    {% if property.main_image %}
+                        <img src="{{ property.main_image.url }}" alt="{{ property.title }}" class="w-full h-96 object-cover">
+                    {% else %}
+                        <div class="w-full h-96 bg-gray-200 flex items-center justify-center">
+                            <span class="text-gray-500">No Image Available</span>
+                        </div>
+                    {% endif %}
+                </div>
+
+                <!-- Virtual Tour / Video -->
+                {% if property.virtual_tour_url %}
+                <div class="mb-8">
+                    <h3 class="text-xl font-bold text-gray-900 mb-4">Virtual Tour</h3>
+                    <div class="bg-white rounded-xl shadow-lg p-6 flex justify-center">
+                        {{ property.get_video_embed_html|safe }}
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- Image Gallery -->
+                {% if property.images.all %}
+                <div class="mb-8">
+                    <h3 class="text-xl font-bold text-gray-900 mb-4">Gallery</h3>
+                    <div class="image-gallery">
+                        {% for img in property.images.all %}
+                            <img src="{{ img.image.url }}" alt="{{ img.caption|default:property.title }}" class="gallery-image">
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- Property Header -->
+                <div class="mb-8">
+                    <div class="flex flex-wrap items-start justify-between gap-4 mb-4">
+                        <div>
+                            <span class="inline-block px-3 py-1 bg-blue-100 text-blue-800 text-sm font-semibold rounded-full mb-2">
+                                {{ property.get_property_type_display }}
+                            </span>
+                            <h1 class="text-3xl md:text-4xl font-bold text-gray-900 mb-2">{{ property.title }}</h1>
+                            <p class="text-gray-600 flex items-center text-lg">
+                                <svg class="h-5 w-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                </svg>
+                                {{ property.location }}{% if property.address %}, {{ property.address }}{% endif %}
+                                {% if property.division or property.district or property.thana or property.postcode %}
+                                    <br>
+                                    <span class="text-gray-500 text-sm">
+                                        {% if property.division %}{{ property.get_division_display }}{% endif %}
+                                        {% if property.district %}, {{ property.district }}{% endif %}
+                                        {% if property.thana %}, {{ property.thana }}{% endif %}
+                                        {% if property.postcode %} ({{ property.postcode }}){% endif %}
+                                    </span>
+                                {% endif %}
+                            </p>
+                            {% if property.agent %}
+                                <p class="text-gray-500 mt-2 flex items-center">
+                                    <svg class="h-5 w-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+                                    </svg>
+                                    Agent: {{ property.agent.name }}
+                                </p>
+                            {% endif %}
+                        </div>
+                        <div class="text-right">
+                            <div class="text-3xl font-bold text-blue-600">{{ property.price|bdt }}</div>
+                            <div class="text-gray-500">per month</div>
+                            {% if property.rating > 0 %}
+                                <div class="flex items-center justify-end mt-2 space-x-2">
+                                    <div class="flex items-center">
+                                        {% for i in "12345" %}
+                                            {% if forloop.counter <= property.rating|floatformat:0|add:0 %}
+                                                <svg class="w-5 h-5 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
+                                                    <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/>
+                                                </svg>
+                                            {% else %}
+                                                <svg class="w-5 h-5 text-gray-300" fill="currentColor" viewBox="0 0 20 20">
+                                                    <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/>
+                                                </svg>
+                                            {% endif %}
+                                        {% endfor %}
+                                    </div>
+                                    <span class="text-sm font-medium text-gray-700">{{ property.rating|floatformat:1 }} ({{ property.review_count }})</span>
+                                </div>
+                            {% endif %}
+                            {% if user == property.owner %}
+                                <div class="mt-2 space-x-2">
+                                    <a href="{% url 'edit_property' property.pk %}" class="text-blue-600 hover:underline text-sm">Edit</a>
+                                    <a href="{% url 'delete_property' property.pk %}" class="text-red-600 hover:underline text-sm" onclick="return confirm('Are you sure?')">Delete</a>
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    {% if property.featured_tag %}
+                    <div class="mb-4">
+                        <span class="{{ property.get_featured_tag_color }} text-white px-4 py-1 rounded-full text-sm font-medium">
+                            {{ property.get_featured_tag_display }}
+                        </span>
+                    </div>
+                    {% endif %}
+                </div>
+
+                <!-- Property Details Grid -->
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 p-6 bg-gray-50 rounded-xl mb-8">
+                    <div class="text-center">
+                        <div class="text-2xl font-bold text-gray-900">{{ property.bedrooms }}</div>
+                        <div class="text-sm text-gray-600">Bedrooms</div>
+                    </div>
+                    <div class="text-center">
+                        <div class="text-2xl font-bold text-gray-900">{{ property.bathrooms }}</div>
+                        <div class="text-sm text-gray-600">Bathrooms</div>
+                    </div>
+                    <div class="text-center">
+                        <div class="text-2xl font-bold text-gray-900">{{ property.square_feet|add:"," }}</div>
+                        <div class="text-sm text-gray-600">Sq Ft</div>
+                    </div>
+                    <div class="text-center">
+                        <div class="text-2xl font-bold text-gray-900">{% if property.year_built %}{{ property.year_built }}{% else %}N/A{% endif %}</div>
+                        <div class="text-sm text-gray-600">Year Built</div>
+                    </div>
+                </div>
+
+                <!-- Description -->
+                <div class="mb-8">
+                    <h2 class="text-2xl font-bold text-gray-900 mb-4">Description</h2>
+                    <div class="prose max-w-none text-gray-600 leading-relaxed whitespace-pre-line">
+                        {{ property.description }}
+                    </div>
+                </div>
+
+                <!-- Property Features & Rules -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
+                    <div>
+                        <h2 class="text-2xl font-bold text-gray-900 mb-4">Amenities</h2>
+                        {% with amenities_by_category=property.get_amenities_by_category %}
+                            {% if amenities_by_category %}
+                                <div class="space-y-6">
+                                    {% for category_name, category_data in amenities_by_category.items %}
+                                        <div>
+                                            <h3 class="text-lg font-bold text-gray-800 mb-3 flex items-center">
+                                                <svg class="h-5 w-5 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
+                                                </svg>
+                                                {{ category_name }}
+                                            </h3>
+                                            <div class="grid grid-cols-2 gap-2">
+                                                {% for amenity in category_data.amenities %}
+                                                    <div class="flex items-center text-gray-700 bg-gray-50 px-3 py-2 rounded-lg">
+                                                        {% if amenity.icon %}
+                                                            <i class="{{ amenity.icon }} text-lg mr-2 text-blue-600"></i>
+                                                        {% else %}
+                                                            <svg class="h-4 w-4 mr-2 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                                                                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                                                            </svg>
+                                                        {% endif %}
+                                                        <span class="text-sm">{{ amenity.name }}</span>
+                                                    </div>
+                                                {% endfor %}
+                                            </div>
+                                        </div>
+                                    {% endfor %}
+                                </div>
+                            {% else %}
+                                <p class="text-gray-500">No specific amenities listed.</p>
+                            {% endif %}
+                        {% endwith %}
+                    </div>
+
+                    <!-- Reviews Section -->
+                    <div class="mt-8">
+                        <div class="flex justify-between items-center mb-6">
+                            <h2 class="text-2xl font-bold text-gray-900">Reviews ({{ reviews|length }})</h2>
+                            {% if user.is_authenticated and not user_review %}
+                                <a href="{% url 'add_review' property.pk %}" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition text-sm font-medium">
+                                    Write a Review
+                                </a>
+                            {% endif %}
+                        </div>
+
+                        {% if reviews %}
+                            <div class="space-y-6">
+                                {% for review in reviews %}
+                                    <div class="bg-gray-50 rounded-xl p-6">
+                                        <div class="flex justify-between items-start mb-4">
+                                            <div>
+                                                <div class="flex items-center mb-1">
+                                                    {% for i in "12345" %}
+                                                        {% if forloop.counter <= review.rating %}
+                                                            <svg class="w-5 h-5 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
+                                                                <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/>
+                                                            </svg>
+                                                        {% else %}
+                                                            <svg class="w-5 h-5 text-gray-300" fill="currentColor" viewBox="0 0 20 20">
+                                                                <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/>
+                                                            </svg>
+                                                        {% endif %}
+                                                    {% endfor %}
+                                                    <span class="ml-2 font-semibold text-gray-900">{{ review.rating }}.0</span>
+                                                </div>
+                                                <p class="text-sm text-gray-600">{{ review.user.username }}</p>
+                                                {% if review.is_verified %}
+                                                    <span class="inline-block px-2 py-1 bg-green-100 text-green-800 text-xs font-medium rounded-full mt-1">
+                                                        Verified Guest
+                                                    </span>
+                                                {% endif %}
+                                            </div>
+                                            <div class="text-right">
+                                                <p class="text-xs text-gray-500">{{ review.created_at|date:"M d, Y" }}</p>
+                                            </div>
+                                        </div>
+
+                                        <p class="text-gray-700 mb-4">{{ review.comment|linebreaks }}</p>
+
+                                        {% if review.owner_response %}
+                                            <div class="border-l-4 border-blue-500 pl-4 mt-4 bg-blue-50 p-4 rounded">
+                                                <p class="text-sm font-semibold text-blue-900 mb-1">Response from Property Owner</p>
+                                                <p class="text-gray-700">{{ review.owner_response|linebreaks }}</p>
+                                                <p class="text-xs text-gray-500 mt-2">{{ review.owner_response_date|date:"M d, Y g:i A" }}</p>
+                                            </div>
+                                        {% endif %}
+
+                                        {% if user == property.owner and not review.owner_response %}
+                                            <form method="post" action="{% url 'respond_review' review.pk %}" class="mt-4">
+                                                {% csrf_token %}
+                                                <div class="flex gap-2">
+                                                    <textarea name="owner_response" rows="2" class="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-sm" placeholder="Write a response to this review..."></textarea>
+                                                    <button type="submit" class="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition">
+                                                        Respond
+                                                    </button>
+                                                </div>
+                                            </form>
+                                        {% endif %}
+
+                                        {% if user == review.user and not review.owner_response %}
+                                            <div class="mt-4">
+                                                <a href="{% url 'delete_review' review.pk %}" class="text-red-600 hover:text-red-700 text-sm font-medium" onclick="return confirm('Delete your review?')">
+                                                    Delete Review
+                                                </a>
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                {% endfor %}
+                            </div>
+
+                            {% if reviews|length >= 10 %}
+                                <div class="mt-6 text-center">
+                                    <p class="text-gray-500 text-sm">Showing latest 10 reviews. More reviews available in admin.</p>
+                                </div>
+                            {% endif %}
+                        {% else %}
+                            <div class="text-center py-12 bg-gray-50 rounded-xl">
+                                <svg class="h-16 w-16 text-gray-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"/>
+                                </svg>
+                                <p class="text-gray-600">No reviews yet for this property.</p>
+                                {% if user.is_authenticated %}
+                                    <p class="text-sm text-gray-500 mt-2">Be the first to review!</p>
+                                {% endif %}
+                            </div>
+                        {% endif %}
+                    </div>
+
+                    <div>
+                        <h2 class="text-2xl font-bold text-gray-900 mb-4">Property Rules</h2>
+                            <div class="flex justify-between py-2 border-b">
+                                <span class="text-gray-600">Pets Allowed</span>
+                                <span class="font-medium {% if property.pets_allowed == 'yes' or property.pets_allowed == 'allowed' %}text-green-600{% else %}text-red-600{% endif %}">
+                                    {{ property.get_pets_allowed_display|default:"Not specified" }}
+                                </span>
+                            </div>
+                            <div class="flex justify-between py-2 border-b">
+                                <span class="text-gray-600">Smoking Allowed</span>
+                                <span class="font-medium {% if property.smoking_allowed == 'yes' or property.smoking_allowed == 'allowed' %}text-green-600{% else %}text-red-600{% endif %}">
+                                    {{ property.get_smoking_allowed_display|default:"Not specified" }}
+                                </span>
+                            </div>
+                            <div class="flex justify-between py-2 border-b">
+                                <span class="text-gray-600">Parties Allowed</span>
+                                <span class="font-medium {% if property.parties_allowed == 'yes' or property.parties_allowed == 'allowed' %}text-green-600{% else %}text-red-600{% endif %}">
+                                    {{ property.get_parties_allowed_display|default:"Not specified" }}
+                                </span>
+                            </div>
+                            {% if property.quiet_hours %}
+                            <div class="py-2 border-b">
+                                <span class="text-gray-600">Quiet Hours</span>
+                                <p class="font-medium mt-1">{{ property.quiet_hours }}</p>
+                            </div>
+                            {% endif %}
+                            {% if property.lease_term %}
+                            <div class="py-2 border-b">
+                                <span class="text-gray-600">Lease Term</span>
+                                <p class="font-medium mt-1">{{ property.lease_term }}</p>
+                            </div>
+                            {% endif %}
+                            {% if property.security_deposit %}
+                            <div class="py-2 border-b">
+                                <span class="text-gray-600">Security Deposit</span>
+                                <p class="font-medium mt-1">${{ property.security_deposit|floatformat:0 }}</p>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Floor Plan -->
+                {% if property.floor_plan_image %}
+                <div class="mb-8">
+                    <h2 class="text-2xl font-bold text-gray-900 mb-4">Floor Plan</h2>
+                    <img src="{{ property.floor_plan_image.url }}" alt="Floor Plan" class="max-w-full h-auto border rounded-lg shadow">
+                </div>
+                {% endif %}
+
+                <!-- Virtual Tour -->
+                {% if property.virtual_tour_url %}
+                <div class="mb-8">
+                    <h2 class="text-2xl font-bold text-gray-900 mb-4">Virtual Tour</h2>
+                    <div class="aspect-video">
+                        <iframe src="{{ property.virtual_tour_url|replace:'watch?v=','embed/' }}" class="w-full h-full rounded-lg" frameborder="0" allowfullscreen></iframe>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Sidebar -->
+            <div class="lg:col-span-1">
+                <!-- Contact Card -->
+                <div class="bg-white rounded-xl shadow-lg p-6 sticky top-24 mb-6">
+                    <div class="text-center mb-6">
+                        <div class="text-3xl font-bold text-blue-600 mb-2">{{ property.price|bdt }}</div>
+                        <div class="text-gray-500">per month</div>
+                        {% if property.application_fee %}
+                            <div class="mt-2 text-sm text-gray-600">
+                                Application Fee: {{ property.application_fee|bdt_with_decimal }}
+                            </div>
+                        {% endif %}
+                    </div>
+
+                    <div class="space-y-3">
+                        <a href="{% url 'submit_inquiry' property.pk %}" class="w-full bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition font-medium text-center block">
+                            Contact Owner
+                        </a>
+
+                        <form method="post" action="{% url 'toggle_favorite' property.pk %}" class="inline-block w-full">
+                            {% csrf_token %}
+                            <button type="submit" class="w-full {% if is_favorited %}bg-red-600 text-white{% else %}bg-white border border-gray-300 text-gray-700{% endif %} px-6 py-3 rounded-lg hover:{% if is_favorited %}bg-red-700{% else %}bg-gray-50{% endif %} transition font-medium flex items-center justify-center">
+                                <svg class="h-5 w-5 mr-2" fill="{% if is_favorited %}currentColor{% else %}none{% endif %}" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/>
+                                </svg>
+                                {% if is_favorited %}Remove Favorite{% else %}Add to Favorites{% endif %}
+                            </button>
+                        </form>
+
+                        <a href="{% url 'home' %}" class="w-full bg-white border border-gray-300 text-gray-700 px-6 py-3 rounded-lg hover:bg-gray-50 transition font-medium text-center block">
+                            Share Property
+                        </a>
+                    </div>
+
+                    {% if property.agent %}
+                    <div class="mt-6 pt-6 border-t">
+                        <h3 class="text-lg font-bold text-gray-900 mb-3">Contact Agent</h3>
+                        <div class="flex items-center mb-4">
+                            {% if property.agent.photo %}
+                                <img src="{{ property.agent.photo.url }}" alt="{{ property.agent.name }}" class="h-16 w-16 rounded-full mr-4 object-cover">
+                            {% else %}
+                                <div class="h-16 w-16 rounded-full bg-gray-300 mr-4 flex items-center justify-center">
+                                    <span class="text-gray-600">No Photo</span>
+                                </div>
+                            {% endif %}
+                            <div>
+                                <div class="font-bold text-gray-900">{{ property.agent.name }}</div>
+                                {% if property.agent.bio %}
+                                    <p class="text-sm text-gray-600">{{ property.agent.bio|truncatewords:10 }}</p>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% if property.agent.email %}
+                            <a href="mailto:{{ property.agent.email }}" class="text-blue-600 hover:underline text-sm block mb-1">
+                                {{ property.agent.email }}
+                            </a>
+                        {% endif %}
+                        {% if property.agent.phone %}
+                            <a href="tel:{{ property.agent.phone }}" class="text-blue-600 hover:underline text-sm block">
+                                {{ property.agent.phone|phone_bd }}
+                            </a>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                </div>
+
+                <!-- Property Info Card -->
+                <div class="bg-white rounded-xl shadow-lg p-6">
+                    <h3 class="text-lg font-bold text-gray-900 mb-4">Property Information</h3>
+                    <dl class="space-y-3">
+                        <div class="flex justify-between">
+                            <dt class="text-gray-600">Property ID</dt>
+                            <dd class="font-medium text-gray-900">#{{ property.pk }}</dd>
+                        </div>
+                        <div class="flex justify-between">
+                            <dt class="text-gray-600">Property Type</dt>
+                            <dd class="font-medium text-gray-900">{{ property.get_property_type_display }}</dd>
+                        </div>
+                        <div class="flex justify-between">
+                            <dt class="text-gray-600">Bedrooms</dt>
+                            <dd class="font-medium text-gray-900">{{ property.bedrooms }}</dd>
+                        </div>
+                        <div class="flex justify-between">
+                            <dt class="text-gray-600">Bathrooms</dt>
+                            <dd class="font-medium text-gray-900">{{ property.bathrooms }}</dd>
+                        </div>
+                        <div class="flex justify-between">
+                            <dt class="text-gray-600">Square Feet</dt>
+                            <dd class="font-medium text-gray-900">{{ property.square_feet|add:"," }}</dd>
+                        </div>
+                        {% if property.get_price_per_sqft %}
+                        <div class="flex justify-between">
+                            <dt class="text-gray-600">Price/Sqft</dt>
+                            <dd class="font-medium text-green-600">${{ property.get_price_per_sqft|floatformat:2 }}</dd>
+                        </div>
+                        {% endif %}
+                        {% if property.parking_spaces %}
+                        <div class="flex justify-between">
+                            <dt class="text-gray-600">Parking</dt>
+                            <dd class="font-medium text-gray-900">{{ property.parking_spaces }} space{{ property.parking_spaces|pluralize }}</dd>
+                        </div>
+                        {% endif %}
+                        <div class="flex justify-between">
+                            <dt class="text-gray-600">Listed</dt>
+                            <dd class="font-medium text-gray-900">{{ property.created_at|date:"M d, Y" }}</dd>
+                        </div>
+                        <div class="flex justify-between">
+                            <dt class="text-gray-600">Status</dt>
+                            <dd class="font-medium {% if property.is_available %}text-green-600{% else %}text-red-600{% endif %}">
+                                {{ property.get_status_display }}
+                            </dd>
+                        </div>
+                    </dl>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Related Properties -->
+{% if related_properties %}
+<section class="py-20 bg-gray-50">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <h2 class="text-3xl font-bold text-gray-900 mb-8">Similar Properties in {{ property.location }}</h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {% for rel_prop in related_properties %}
+            <div class="bg-white rounded-xl shadow-lg overflow-hidden hover:shadow-2xl transition duration-300 group">
+                <div class="relative">
+                    {% if rel_prop.main_image %}
+                    <a href="{% url 'property_detail' rel_prop.pk %}">
+                        <img src="{{ rel_prop.main_image.url }}" alt="{{ rel_prop.title }}" class="w-full h-64 object-cover group-hover:scale-105 transition duration-500" loading="lazy">
+                    </a>
+                    {% else %}
+                    <div class="w-full h-64 bg-gray-300 flex items-center justify-center">
+                        <span class="text-gray-500">No Image</span>
+                    </div>
+                    {% endif %}
+                </div>
+                <div class="p-6">
+                    <div class="flex justify-between items-start mb-2">
+                        <div>
+                            <h3 class="text-xl font-bold text-gray-900">{{ rel_prop.title }}</h3>
+                            <p class="text-gray-600">{{ rel_prop.location }}</p>
+                        </div>
+                        <span class="text-xl font-bold text-blue-600">{{ rel_prop.price|bdt }}/mo</span>
+                    </div>
+                    <div class="flex items-center text-gray-500 text-sm mb-4 space-x-4">
+                        <span>{{ rel_prop.bedrooms }} bed</span>
+                        <span>{{ rel_prop.bathrooms }} bath</span>
+                        <span>{{ rel_prop.square_feet }} sqft</span>
+                        {% with price_per_sqft=rel_prop.get_price_per_sqft %}
+                            {% if price_per_sqft %}
+                                <span class="text-green-600 font-medium">${{ price_per_sqft|floatformat:2 }}/sqft</span>
+                            {% endif %}
+                        {% endwith %}
+                    </div>
+                    <a href="{% url 'property_detail' rel_prop.pk %}" class="text-blue-600 font-medium hover:text-blue-700 transition">
+                        View Details →
+                    </a>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</section>
+{% endif %}
+{% endblock %}

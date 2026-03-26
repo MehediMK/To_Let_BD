@@ -1,0 +1,398 @@
+{% extends "base.html" %}
+{% load static %}
+{% load bd_filters %}
+
+{% block title %}Dashboard - Rent&Stay{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.css">
+<style>
+    .stat-card {
+        background: white;
+        border-radius: 12px;
+        padding: 1.5rem;
+        box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+        transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .stat-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+    }
+    .stat-icon {
+        width: 48px;
+        height: 48px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 24px;
+    }
+    .stat-value {
+        font-size: 2rem;
+        font-weight: 700;
+    }
+    .stat-label {
+        color: #6b7280;
+        font-size: 0.875rem;
+    }
+    .chart-container {
+        position: relative;
+        height: 300px;
+        width: 100%;
+    }
+    .activity-item {
+        padding: 0.75rem 0;
+        border-bottom: 1px solid #f3f4f6;
+    }
+    .activity-item:last-child {
+        border-bottom: none;
+    }
+    .property-rank {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        font-weight: 700;
+        font-size: 0.875rem;
+        margin-right: 0.75rem;
+    }
+    .rank-1 { background: #fef3c7; color: #d97706; }
+    .rank-2 { background: #e5e7eb; color: #6b7280; }
+    .rank-3 { background: #fed7aa; color: #c2410c; }
+    .rank-other { background: #f3f4f6; color: #6b7280; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="py-8 bg-gray-50 min-h-screen">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <!-- Header -->
+        <div class="mb-8">
+            <h1 class="text-3xl font-bold text-gray-900">Dashboard</h1>
+            <p class="text-gray-600 mt-1">Welcome back, {{ user.username }}! Here's your property performance overview.</p>
+        </div>
+
+        <!-- Key Metrics Grid -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <div class="stat-card">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <div class="stat-value text-blue-600">{{ total_properties }}</div>
+                        <div class="stat-label">Total Properties</div>
+                    </div>
+                    <div class="stat-icon bg-blue-100 text-blue-600">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
+                        </svg>
+                    </div>
+                </div>
+            </div>
+
+            <div class="stat-card">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <div class="stat-value text-green-600">{{ active_properties }}</div>
+                        <div class="stat-label">Active Listings</div>
+                    </div>
+                    <div class="stat-icon bg-green-100 text-green-600">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                        </svg>
+                    </div>
+                </div>
+            </div>
+
+            <div class="stat-card">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <div class="stat-value text-purple-600">{{ total_views|intcomma }}</div>
+                        <div class="stat-label">Total Views</div>
+                    </div>
+                    <div class="stat-icon bg-purple-100 text-purple-600">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                        </svg>
+                    </div>
+                </div>
+            </div>
+
+            <div class="stat-card">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <div class="stat-value text-orange-600">{{ total_inquiries|intcomma }}</div>
+                        <div class="stat-label">Total Inquiries</div>
+                    </div>
+                    <div class="stat-icon bg-orange-100 text-orange-600">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/>
+                        </svg>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Second Row: More Stats -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <div class="stat-card">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <div class="stat-value text-yellow-600">{{ avg_rating }}</div>
+                        <div class="stat-label">Average Rating</div>
+                        <div class="flex mt-2">
+                            {% for i in "12345" %}
+                                <svg class="w-4 h-4 {% if forloop.counter <= avg_rating|floatformat:0|add:0 %}text-yellow-400{% else %}text-gray-300{% endif %}" fill="currentColor" viewBox="0 0 20 20">
+                                    <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/>
+                                </svg>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    <div class="stat-icon bg-yellow-100 text-yellow-600">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"/>
+                        </svg>
+                    </div>
+                </div>
+            </div>
+
+            <div class="stat-card">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <div class="stat-value text-red-600">{{ total_reviews|intcomma }}</div>
+                        <div class="stat-label">Total Reviews</div>
+                    </div>
+                    <div class="stat-icon bg-red-100 text-red-600">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"/>
+                        </svg>
+                    </div>
+                </div>
+            </div>
+
+            <div class="stat-card">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <div class="stat-value text-pink-600">{{ total_favorites|intcomma }}</div>
+                        <div class="stat-label">Total Favorites</div>
+                    </div>
+                    <div class="stat-icon bg-pink-100 text-pink-600">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/>
+                        </svg>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Quick Stats Row -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+            <!-- Top Properties by Views -->
+            <div class="bg-white rounded-xl shadow p-6">
+                <h3 class="text-lg font-bold text-gray-900 mb-4">Top Properties by Views</h3>
+                {% if top_by_views %}
+                    <div class="space-y-4">
+                        {% for prop in top_by_views %}
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center">
+                                    {% if forloop.counter <= 3 %}
+                                        <span class="property-rank rank-{{ forloop.counter }}">{{ forloop.counter }}</span>
+                                    {% else %}
+                                        <span class="property-rank rank-other">{{ forloop.counter }}</span>
+                                    {% endif %}
+                                    <div>
+                                        <div class="font-medium text-gray-900">{{ prop.title|truncatechars:30 }}</div>
+                                        <div class="text-sm text-gray-500">{{ prop.location }}</div>
+                                    </div>
+                                </div>
+                                <div class="text-right">
+                                    <div class="font-bold text-gray-900">{{ prop.views|intcomma }}</div>
+                                    <div class="text-xs text-gray-500">views</div>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <p class="text-gray-500 text-center py-8">No properties yet. Start listing properties to see stats.</p>
+                {% endif %}
+            </div>
+
+            <!-- Top Properties by Inquiries -->
+            <div class="bg-white rounded-xl shadow p-6">
+                <h3 class="text-lg font-bold text-gray-900 mb-4">Top Properties by Inquiries</h3>
+                {% if top_by_inquiries %}
+                    <div class="space-y-4">
+                        {% for prop in top_by_inquiries %}
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center">
+                                    {% if forloop.counter <= 3 %}
+                                        <span class="property-rank rank-{{ forloop.counter }}">{{ forloop.counter }}</span>
+                                    {% else %}
+                                        <span class="property-rank rank-other">{{ forloop.counter }}</span>
+                                    {% endif %}
+                                    <div>
+                                        <div class="font-medium text-gray-900">{{ prop.title|truncatechars:30 }}</div>
+                                        <div class="text-sm text-gray-500">{{ prop.location }}</div>
+                                    </div>
+                                </div>
+                                <div class="text-right">
+                                    <div class="font-bold text-gray-900">{{ prop.inquiry_count|intcomma }}</div>
+                                    <div class="text-xs text-gray-500">inquiries</div>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <p class="text-gray-500 text-center py-8">No inquiries yet.</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Performance Chart & Recent Activity -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+            <!-- Properties Overview Chart -->
+            <div class="bg-white rounded-xl shadow p-6">
+                <h3 class="text-lg font-bold text-gray-900 mb-4">Property Overview</h3>
+                <div class="chart-container">
+                    <canvas id="propertyChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Recent Activity -->
+            <div class="lg:col-span-2 bg-white rounded-xl shadow p-6">
+                <h3 class="text-lg font-bold text-gray-900 mb-4">Recent Inquiries</h3>
+                {% if recent_inquiries_list %}
+                    <div class="space-y-4">
+                        {% for inquiry in recent_inquiries_list %}
+                            <div class="activity-item">
+                                <div class="flex items-start justify-between">
+                                    <div class="flex-1">
+                                        <div class="font-medium text-gray-900">{{ inquiry.name }}</div>
+                                        <div class="text-sm text-gray-600">Inquired about: <a href="{% url 'property_detail' inquiry.property.pk %}" class="text-blue-600 hover:underline">{{ inquiry.property.title|truncatechars:40 }}</a></div>
+                                        <div class="text-xs text-gray-500 mt-1">{{ inquiry.created_at|date:"M d, Y g:i A" }}</div>
+                                    </div>
+                                    <div>
+                                        {% if inquiry.status == 'new' %}
+                                            <span class="px-2 py-1 text-xs font-medium rounded-full bg-yellow-100 text-yellow-800">New</span>
+                                        {% elif inquiry.status == 'responded' %}
+                                            <span class="px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800">Responded</span>
+                                        {% elif inquiry.status == 'approved' %}
+                                            <span class="px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800">Approved</span>
+                                        {% elif inquiry.status == 'rented' %}
+                                            <span class="px-2 py-1 text-xs font-medium rounded-full bg-green-600 text-white">Rented</span>
+                                        {% else %}
+                                            <span class="px-2 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-800">{{ inquiry.get_status_display }}</span>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                    <div class="mt-4 text-center">
+                        <a href="{% url 'owner_inquiries' %}" class="text-blue-600 hover:underline text-sm font-medium">View All Inquiries →</a>
+                    </div>
+                {% else %}
+                    <p class="text-gray-500 text-center py-8">No inquiries received yet.</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Property List Stats -->
+        <div class="bg-white rounded-xl shadow p-6 mb-8">
+            <h3 class="text-lg font-bold text-gray-900 mb-4">Your Properties Performance</h3>
+            {% if total_properties > 0 %}
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Property</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Views</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Inquiries</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Rating</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Favorites</th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200">
+                            {% for prop in my_properties|slice:":10" %}
+                                <tr>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <div class="flex items-center">
+                                            {% if prop.main_image %}
+                                                <img class="h-12 w-12 rounded-lg object-cover mr-3" src="{{ prop.main_image.url }}" alt="">
+                                            {% endif %}
+                                            <div>
+                                                <div class="font-medium text-gray-900">{{ prop.title|truncatechars:30 }}</div>
+                                                <div class="text-sm text-gray-500">{{ prop.location }}</div>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        {% if prop.is_available %}
+                                            <span class="px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800">Available</span>
+                                        {% else %}
+                                            <span class="px-2 py-1 text-xs font-medium rounded-full bg-red-100 text-red-800">Rented</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-gray-900 font-medium">{{ prop.views|intcomma }}</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-gray-900">{{ prop.inquiries.count }}</td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        {% if prop.rating > 0 %}
+                                            <div class="flex items-center">
+                                                <svg class="w-4 h-4 text-yellow-400 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                                    <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/>
+                                                </svg>
+                                                {{ prop.rating|floatformat:1 }} ({{ prop.review_count }})
+                                            </div>
+                                        {% else %}
+                                            <span class="text-gray-400">No ratings</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-gray-900">{{ prop.favorited_by.count }}</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <p class="text-gray-500 text-center py-8">You haven't listed any properties yet. <a href="{% url 'list_property' %}" class="text-blue-600 hover:underline">List your first property</a></p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Property Overview Chart
+        const ctx = document.getElementById('propertyChart');
+        if (ctx) {
+            new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Active', 'Inactive'],
+                    datasets: [{
+                        data: [{{ active_properties }}, {{ total_properties|add:"-"|add:active_properties }}],
+                        backgroundColor: ['#10b981', '#e5e7eb'],
+                        borderWidth: 0,
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    cutout: '70%',
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                        }
+                    }
+                }
+            });
+        }
+    });
+</script>
+{% endblock %}

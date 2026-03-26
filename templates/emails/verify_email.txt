@@ -1,0 +1,14 @@
+Welcome to Rent&Stay, {{ user.first_name|default:user.username }}!
+
+Thank you for signing up. To verify your email address, please visit:
+
+{{ verify_url }}
+
+This verification link will expire in {{ expiry_hours }} hours.
+
+If you didn't create an account with Rent&Stay, please ignore this email.
+
+Best regards,
+The Rent&Stay Team
+
+© {% now "Y" %} Rent&Stay. All rights reserved.
