@@ -57,7 +57,7 @@
                 <!-- Main Image -->
                 <div class="mb-8 rounded-xl overflow-hidden shadow-lg">
                     {% if property.main_image %}
-                        <img src="{{ property.main_image.url }}" alt="{{ property.title }}" class="w-full h-96 object-cover">
+                        <img src="{{ property.main_image.url }}" alt="{{ property.title }}" class="w-full h-96 object-cover" width="1200" height="384" loading="eager" fetchpriority="high">
                     {% else %}
                         <div class="w-full h-96 bg-gray-200 flex items-center justify-center">
                             <span class="text-gray-500">No Image Available</span>
@@ -89,7 +89,7 @@
                     <h3 class="text-xl font-bold text-gray-900 mb-4">Gallery</h3>
                     <div class="image-gallery">
                         {% for img in property.images.all %}
-                            <img src="{{ img.image.url }}" alt="{{ img.caption|default:property.title }}" class="gallery-image">
+                            <img src="{{ img.image.url }}" alt="{{ img.caption|default:property.title }}" class="gallery-image" loading="lazy" width="400" height="300">
                         {% endfor %}
                     </div>
                 </div>

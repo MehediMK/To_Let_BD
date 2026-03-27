@@ -39,10 +39,34 @@ def home(request):
     }
     return render(request, 'index.html', context)
 
+from django.views.decorators.cache import cache_page
+from django.utils.decorators import method_decorator
+from django.core.cache import cache
+
 def property_detail(request, pk):
-    # Get property without is_available filter initially
+    from django.core.cache import cache
+    from django.utils import timezone
+    import json
+
+    # For authenticated users, don't cache full page (personalized content)
+    # For anonymous users, cache for 5 minutes
+    if not request.user.is_authenticated:
+        cache_key_page = f'property_detail:anon:{pk}'
+        cached_response = cache.get(cache_key_page)
+        if cached_response:
+            return cached_response
+    else:
+        cache_key_page = None
+
+    # Get property with all related data prefetched
     property_obj = get_object_or_404(
-        Property.objects.select_related('agent', 'owner'),
+        Property.objects.select_related('agent', 'owner')
+        .prefetch_related(
+            'property_amenities__amenity',
+            'images',
+            'reviews__user',
+            'favorited_by'
+        ),
         pk=pk
     )
 
@@ -60,42 +84,41 @@ def property_detail(request, pk):
         messages.error(request, 'This property is no longer available.')
         return redirect('home')
 
-    # Track visit with detailed analytics
-    from .models import PropertyVisit
-    from django.utils import timezone
-
     try:
-        # Get client IP
+        # Get client info
         x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
-        if x_forwarded_for:
-            ip = x_forwarded_for.split(',')[0].strip()
-        else:
-            ip = request.META.get('REMOTE_ADDR')
+        ip = x_forwarded_for.split(',')[0].strip() if x_forwarded_for else request.META.get('REMOTE_ADDR', '')
+        user_agent = request.META.get('HTTP_USER_AGENT', '')[:500]  # Limit length
+        referrer = request.META.get('HTTP_REFERER', '')[:500]
 
-        # Get user agent
-        user_agent = request.META.get('HTTP_USER_AGENT', '')
+        # Create visit data dict
+        visit_data = {
+            'property_id': property_obj.id,
+            'ip_address': ip,
+            'user_agent': user_agent,
+            'referrer': referrer,
+            'user_id': request.user.id if request.user.is_authenticated else None,
+            'session_key': request.session.session_key or '',
+            'timestamp': timezone.now().isoformat(),
+        }
 
-        # Get referrer
-        referrer = request.META.get('HTTP_REFERER', '')
+        # Add to cache queue (will be processed by management command or signal)
+        cache_key = f'property_visit_queue:{timezone.now().strftime("%Y%m%d")}'
+        cache.rpush(cache_key, json.dumps(visit_data))
+        cache.expire(cache_key, 86400 * 7)  # Keep for 7 days
 
-        # Create visit record
-        PropertyVisit.objects.create(
-            property=property_obj,
-            ip_address=ip,
-            user_agent=user_agent,
-            referrer=referrer,
-            user=request.user if request.user.is_authenticated else None,
-            session_key=request.session.session_key or ''
-        )
+        # Also increment simple counter in cache (for immediate stats)
+        cache.incr(f'property_views:{property_obj.id}:{timezone.now().date()}', 1)
     except Exception as e:
-        # Log error but don't prevent view from rendering
-        print(f"Failed to track visit: {e}")
+        # Never fail the request due to analytics tracking
+        pass
 
-    # Increment view count (legacy field)
-    property_obj.views = getattr(property_obj, 'views', 0) + 1
-    property_obj.save(update_fields=['views'] if 'views' in [f.name for f in Property._meta.fields] else [])
+    # Increment view count (legacy field) - use cache to avoid DB hit on every request
+    cache_key_views = f'property_views_legacy:{property_obj.id}'
+    current_views = cache.get(cache_key_views, property_obj.views)
+    cache.set(cache_key_views, current_views + 1, 3600)  # Cache for 1 hour
 
-    # Get related properties (same location, different type) with prefetch
+    # Get related properties with optimized queries
     related_properties = Property.objects.filter(
         location=property_obj.location,
         is_available=True
@@ -104,16 +127,17 @@ def property_detail(request, pk):
     # Check if property is favorited
     is_favorited = False
     if request.user.is_authenticated:
+        # Use cached check or database
         is_favorited = Favorite.objects.filter(
             user=request.user,
             property=property_obj
         ).exists()
 
-    # Get all amenities for this property
-    amenities = property_obj.property_amenities.select_related('amenity').all()
+    # Get amenities for this property (already prefetched)
+    amenities = property_obj.property_amenities.all()
 
-    # Get reviews with pagination (show all reviews)
-    reviews_list = property_obj.reviews.select_related('user').order_by('-created_at')
+    # Get reviews with pagination (already prefetched)
+    reviews_list = property_obj.reviews.all().order_by('-created_at')
     review_page = request.GET.get('review_page', 1)
     reviews_paginator = Paginator(reviews_list, 10)
     reviews = reviews_paginator.get_page(review_page)
@@ -132,7 +156,22 @@ def property_detail(request, pk):
         'user_review': user_review,
         'reviews_paginator': reviews_paginator if 'reviews_paginator' in locals() else None,
     }
-    return render(request, 'property_detail.html', context)
+
+    response = render(request, 'property_detail.html', context)
+
+    # Cache the response for anonymous users (5 minutes)
+    if cache_key_page and not request.user.is_authenticated:
+        cache.set(cache_key_page, response, 300)  # 5 minutes
+        # Add cache control headers
+        response['Cache-Control'] = 'public, max-age=300, s-maxage=600'
+        response['Vary'] = 'Accept-Encoding, Cookie'  # Vary on cookie for anon vs auth
+    else:
+        # For authenticated users, add no-cache headers (personalized content)
+        response['Cache-Control'] = 'private, no-cache, no-store, must-revalidate'
+        response['Pragma'] = 'no-cache'
+        response['Expires'] = '0'
+
+    return response
 
 def search(request):
     query = request.GET.get('q', '')

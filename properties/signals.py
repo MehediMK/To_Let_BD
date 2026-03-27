@@ -143,52 +143,100 @@ def message_notification(sender, instance, created, **kwargs):
 # ANALYTICS SIGNALS
 # =====================================================
 
-@receiver(post_save, sender=PropertyVisit)
-def update_property_analytics(sender, instance, created, **kwargs):
-    """Update daily analytics when a property is visited"""
-    if created:
-        today = date.today()
+def process_cached_visits():
+    """Process cached PropertyVisit data and save to database in batches"""
+    from django.core.cache import cache
+    from django.utils import timezone
+    from datetime import timedelta
+    import json
 
-        # Get or create today's analytics for this property
-        analytics, created = PropertyAnalytics.objects.get_or_create(
-            property=instance.property,
-            date=today,
-            defaults={
-                'unique_visitors': 0,
-                'views': 0,
-                'saves': 0,
-                'inquiries': 0,
-            }
-        )
+    # Process yesterday's data (to ensure we have complete day)
+    target_date = (timezone.now() - timedelta(days=1)).strftime("%Y%m%d")
+    cache_key = f'property_visit_queue:{target_date}'
 
-        # Increment views
-        analytics.views += 1
+    # Get all visits from cache
+    visit_data_list = cache.lrange(cache_key, 0, -1)
+    if not visit_data_list:
+        return 0
 
-        # Check for unique visitor (by IP or user)
-        is_unique = False
-        if instance.user:
-            # Check if this user already visited today
-            existing_visit = PropertyVisit.objects.filter(
-                property=instance.property,
-                user=instance.user,
-                created_at__date=today
-            ).exclude(pk=instance.pk).exists()
-            if not existing_visit:
-                is_unique = True
-        elif instance.ip_address:
-            # Check if this IP already visited today
-            existing_visit = PropertyVisit.objects.filter(
-                property=instance.property,
-                ip_address=instance.ip_address,
-                created_at__date=today
-            ).exclude(pk=instance.pk).exists()
-            if not existing_visit:
-                is_unique = True
+    # Group by property and date for efficient bulk creation
+    visits_to_create = []
+    property_date_counts = {}  # (property_id, date) -> {unique_visitors, views}
 
-        if is_unique:
-            analytics.unique_visitors += 1
+    for visit_data_str in visit_data_list:
+        try:
+            visit_data = json.loads(visit_data_str)
+            property_id = visit_data['property_id']
+            timestamp = timezone.datetime.fromisoformat(visit_data['timestamp'])
+            visit_date = timestamp.date()
 
-        analytics.save()
+            # Count views per property per day
+            key = (property_id, visit_date)
+            if key not in property_date_counts:
+                property_date_counts[key] = {
+                    'views': 0,
+                    'unique_visitors_set': set(),
+                    'saves': 0,
+                    'inquiries': 0,
+                }
+
+            property_date_counts[key]['views'] += 1
+
+            # Track unique visitors
+            user_id = visit_data.get('user_id')
+            ip = visit_data.get('ip_address', '')
+            if user_id:
+                property_date_counts[key]['unique_visitors_set'].add(f"user:{user_id}")
+            elif ip:
+                property_date_counts[key]['unique_visitors_set'].add(f"ip:{ip}")
+
+            # Create PropertyVisit instance (for detailed tracking)
+            visit = PropertyVisit(
+                property_id=property_id,
+                ip_address=visit_data.get('ip_address', ''),
+                user_agent=visit_data.get('user_agent', ''),
+                referrer=visit_data.get('referrer', ''),
+                user_id=visit_data.get('user_id'),
+                session_key=visit_data.get('session_key', ''),
+                created_at=timestamp,
+            )
+            visits_to_create.append(visit)
+
+        except (json.JSONDecodeError, KeyError, ValueError) as e:
+            print(f"Failed to parse visit data: {e}")
+            continue
+
+    # Bulk create PropertyVisit records (in batches)
+    batch_size = 1000
+    for i in range(0, len(visits_to_create), batch_size):
+        batch = visits_to_create[i:i+batch_size]
+        PropertyVisit.objects.bulk_create(batch, ignore_conflicts=True)
+
+    # Update PropertyAnalytics
+    from django.db import transaction
+    with transaction.atomic():
+        for (property_id, visit_date), counts in property_date_counts.items():
+            # Get or create analytics record
+            analytics, created = PropertyAnalytics.objects.get_or_create(
+                property_id=property_id,
+                date=visit_date,
+                defaults={
+                    'views': 0,
+                    'saves': 0,
+                    'inquiries': 0,
+                    'unique_visitors': 0,
+                }
+            )
+
+            # Update counts
+            analytics.views += counts['views']
+            analytics.unique_visitors += len(counts['unique_visitors_set'])
+            analytics.save(update_fields=['views', 'unique_visitors'])
+
+    # Clear processed data from cache
+    cache.delete(cache_key)
+
+    return len(visits_to_create)
 
 
 @receiver(post_save, sender=Favorite)
