@@ -496,12 +496,21 @@
 
                     <!-- Action Buttons - Compact Grid -->
                     <div class="grid grid-cols-2 gap-2 mb-4">
-                        <a href="{% url 'submit_inquiry' property.pk %}" class="bg-blue-600 text-white px-4 py-3 rounded-lg hover:bg-blue-700 transition font-semibold text-center flex items-center justify-center">
-                            <svg class="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
-                            </svg>
-                            Contact
-                        </a>
+                        {% if property.owner %}
+                            <a href="{% url 'send_message_property' property.pk %}" class="bg-blue-600 text-white px-4 py-3 rounded-lg hover:bg-blue-700 transition font-semibold text-center flex items-center justify-center">
+                                <svg class="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                                </svg>
+                                Contact
+                            </a>
+                        {% else %}
+                            <a href="#" class="bg-gray-400 text-white px-4 py-3 rounded-lg cursor-not-allowed font-semibold text-center flex items-center justify-center" title="Contact owner not available">
+                                <svg class="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                                </svg>
+                                Contact
+                            </a>
+                        {% endif %}
 
                         <form method="post" action="{% url 'toggle_favorite' property.pk %}" class="inline-block w-full">
                             {% csrf_token %}
@@ -596,13 +605,6 @@
                                             <span class="text-sm font-medium text-gray-700 group-hover:text-blue-600 truncate">{{ property.agent.email }}</span>
                                         </a>
                                     {% endif %}
-
-                                    <a href="{% url 'submit_inquiry' property.pk %}" class="flex items-center w-full bg-blue-600 text-white hover:bg-blue-700 transition rounded-lg px-3 py-2.5">
-                                        <svg class="h-4 w-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>
-                                        </svg>
-                                        <span class="text-sm font-bold">Send Message</span>
-                                    </a>
                                 </div>
                             </div>
 
@@ -651,7 +653,7 @@
                                         <span class="text-sm font-medium text-gray-700 group-hover:text-blue-600 truncate">{{ property.owner.email }}</span>
                                     </a>
 
-                                    <a href="{% url 'submit_inquiry' property.pk %}" class="flex items-center w-full bg-blue-600 text-white hover:bg-blue-700 transition rounded-lg px-3 py-2.5">
+                                    <a href="{% url 'send_message_property' property.pk %}" class="flex items-center w-full bg-blue-600 text-white hover:bg-blue-700 transition rounded-lg px-3 py-2.5">
                                         <svg class="h-4 w-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>
                                         </svg>

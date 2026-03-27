@@ -123,7 +123,7 @@ class InquiryForm(forms.ModelForm):
 
     class Meta:
         model = Inquiry
-        fields = ['name', 'email', 'phone', 'message', 'move_in_date', 'recipient']
+        fields = ['name', 'email', 'phone', 'message', 'move_in_date']
         widgets = {
             'name': forms.TextInput(attrs={
                 'class': 'w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none',
@@ -146,46 +146,7 @@ class InquiryForm(forms.ModelForm):
                 'type': 'date',
                 'class': 'w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none'
             }),
-            'recipient': forms.RadioSelect(attrs={
-                'class': 'recipient-radio'
-            }),
         }
-
-    def __init__(self, *args, **kwargs):
-        self.property = kwargs.pop('property', None)
-        super().__init__(*args, **kwargs)
-
-        # Dynamically set recipient queryset based on property's owner and agent
-        if self.property:
-            users = []
-            # Add owner if exists
-            if self.property.owner:
-                users.append(self.property.owner)
-            # Add agent only if it exists and is different from owner
-            if self.property.agent and self.property.agent != self.property.owner:
-                users.append(self.property.agent)
-
-            if users:
-                self.fields['recipient'].queryset = User.objects.filter(pk__in=[u.pk for u in users])
-                self.fields['recipient'].empty_label = None
-                # Set field to be required always (to enforce selection)
-                self.fields['recipient'].required = True
-                # If only one recipient, use hidden widget and set default
-                if len(users) == 1:
-                    self.fields['recipient'].widget = forms.HiddenInput()
-                    self.fields['recipient'].initial = users[0]
-                else:
-                    # Multiple recipients: default to property owner
-                    self.fields['recipient'].initial = self.property.owner
-            else:
-                # No recipients available - hide the field
-                self.fields['recipient'].queryset = User.objects.none()
-                self.fields['recipient'].required = False
-                self.fields['recipient'].widget = forms.HiddenInput()
-        else:
-            # If no property provided, hide the field
-            self.fields['recipient'].queryset = User.objects.none()
-            self.fields['recipient'].required = False
 
 class UserProfileForm(forms.ModelForm):
     error_css_class = 'border-red-500'
@@ -488,12 +449,18 @@ class PropertyImageForm(forms.ModelForm):
             }),
             'order': forms.NumberInput(attrs={
                 'class': 'w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none',
-                'min': 0
+                'min': 0,
+                'placeholder': 'Leave blank for auto'
             }),
             'image': forms.ClearableFileInput(attrs={
                 'class': 'w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none file:mr-4 file:py-2 file:px-4 file:border-0 file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100'
             }),
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Make order optional
+        self.fields['order'].required = False
 
     def save(self, commit=True):
         instance = super().save(commit=False)
@@ -537,7 +504,32 @@ class MessageForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         self.sender = kwargs.pop('sender', None)
+        self.property = kwargs.pop('property', None)
         super().__init__(*args, **kwargs)
+
+        # If property is provided, limit receiver to property.owner only (agent is not a User)
+        if self.property:
+            users = []
+            if self.property.owner:
+                users.append(self.property.owner)
+
+            if users:
+                self.fields['receiver'].queryset = User.objects.filter(pk__in=[u.pk for u in users])
+                # If only one user, use hidden input; if multiple, use radio select
+                if len(users) == 1:
+                    self.fields['receiver'].widget = forms.HiddenInput()
+                    self.fields['receiver'].initial = users[0]
+                else:
+                    # Use RadioSelect for multiple choices, default to owner
+                    self.fields['receiver'].widget = forms.RadioSelect(attrs={
+                        'class': 'recipient-radio'
+                    })
+                    self.fields['receiver'].initial = self.property.owner
+                self.fields['receiver'].required = True
+            else:
+                # No users available
+                self.fields['receiver'].queryset = User.objects.none()
+                self.fields['receiver'].required = False
 
     def save(self, commit=True):
         instance = super().save(commit=False)

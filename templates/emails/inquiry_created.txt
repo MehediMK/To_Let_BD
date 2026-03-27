@@ -1,6 +1,6 @@
 Subject: New Inquiry for {{ property.title }}
 
-Hello {{ recipient_name }},
+Hello {{ owner_name }},
 
 You have received a new inquiry for your property "{{ property.title }}".
 

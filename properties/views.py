@@ -1,5 +1,5 @@
 from django.shortcuts import render, get_object_or_404, redirect
-from django.db.models import Q, Count
+from django.db.models import Q, Count, Max
 from django.core.paginator import Paginator
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
@@ -500,11 +500,36 @@ def add_property_image(request, pk):
         if form.is_valid():
             image = form.save(commit=False)
             image.property = property_obj
+
+            # Auto-assign order if not provided or if it conflicts
+            submitted_order = form.cleaned_data.get('order')
+            if submitted_order is not None:
+                # Check if this order already exists for this property
+                existing = PropertyImage.objects.filter(property=property_obj, order=submitted_order).exists()
+                if existing:
+                    # Assign next available order
+                    max_order = PropertyImage.objects.filter(property=property_obj).aggregate(
+                        max_order=Max('order')
+                    )['max_order'] or 0
+                    image.order = max_order + 1
+                else:
+                    image.order = submitted_order
+            else:
+                # No order provided, assign next available
+                max_order = PropertyImage.objects.filter(property=property_obj).aggregate(
+                    max_order=Max('order')
+                )['max_order'] or 0
+                image.order = max_order + 1
+
             image.save()
             messages.success(request, 'Image added successfully!')
             return redirect('edit_property', pk=pk)
     else:
-        form = PropertyImageForm()
+        # Pre-populate with next order number
+        max_order = PropertyImage.objects.filter(property=property_obj).aggregate(
+            max_order=Max('order')
+        )['max_order'] or 0
+        form = PropertyImageForm(initial={'order': max_order + 1})
 
     context = {'form': form, 'property': property_obj}
     return render(request, 'add_image.html', context)
@@ -546,14 +571,13 @@ def favorites_view(request):
 @login_required
 @rate_limit('inquiry', limit=10, period=300)  # 10 inquiries per 5 minutes
 def submit_inquiry(request, pk):
-    property_obj = get_object_or_404(Property.objects.select_related('agent', 'owner'), pk=pk)
+    property_obj = get_object_or_404(Property, pk=pk)
 
     if request.method == 'POST':
-        form = InquiryForm(request.POST, property=property_obj)
+        form = InquiryForm(request.POST)
         if form.is_valid():
             inquiry = form.save(commit=False)
             inquiry.property = property_obj
-            # The recipient is already set by the form
             inquiry.save()
             messages.success(request, 'Your inquiry has been submitted successfully! The property owner will contact you soon.')
             return redirect('property_detail', pk=pk)
@@ -565,11 +589,11 @@ def submit_inquiry(request, pk):
         }
         if hasattr(request.user, 'profile') and request.user.profile.phone:
             initial_data['phone'] = request.user.profile.phone
-        form = InquiryForm(initial=initial_data, property=property_obj)
+        form = InquiryForm(initial=initial_data)
 
     context = {
         'form': form,
-        'property': property_obj,
+        'property': property_obj
     }
     return render(request, 'submit_inquiry.html', context)
 
@@ -778,21 +802,31 @@ def outbox_view(request):
 def send_message_view(request, receiver_id=None, property_id=None):
     """Send a new message"""
     initial = {}
+    property_obj = None
+
+    # Handle property context from URL
+    if property_id:
+        try:
+            property_obj = Property.objects.select_related('agent', 'owner').get(pk=property_id)
+            # Ensure property has an owner (required for messaging)
+            if not property_obj.owner:
+                messages.error(request, 'Cannot send message: This property does not have an owner assigned.')
+                return redirect('property_detail', pk=property_id)
+            initial['property'] = property_obj
+        except Property.DoesNotExist:
+            messages.error(request, 'Property not found.')
+            return redirect('home')
+
+    # Handle explicit receiver_id (takes precedence if both provided)
     if receiver_id:
         try:
             receiver = User.objects.get(pk=receiver_id)
             initial['receiver'] = receiver
         except User.DoesNotExist:
             pass
-    if property_id:
-        try:
-            prop = Property.objects.get(pk=property_id)
-            initial['property'] = prop
-        except Property.DoesNotExist:
-            pass
 
     if request.method == 'POST':
-        form = MessageForm(request.POST, sender=request.user)
+        form = MessageForm(request.POST, sender=request.user, property=property_obj)
         if form.is_valid():
             message = form.save(commit=True)
             messages.success(request, 'Message sent successfully!')
@@ -801,9 +835,12 @@ def send_message_view(request, receiver_id=None, property_id=None):
                 return redirect('property_detail', pk=message.related_property.pk)
             return redirect('outbox')
     else:
-        form = MessageForm(initial=initial, sender=request.user)
+        form = MessageForm(initial=initial, sender=request.user, property=property_obj)
 
-    context = {'form': form}
+    context = {
+        'form': form,
+        'property': property_obj
+    }
     return render(request, 'send_message.html', context)
 
 

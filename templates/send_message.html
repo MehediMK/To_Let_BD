@@ -8,8 +8,16 @@
     <div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
         <!-- Header -->
         <div class="mb-8">
-            <h1 class="text-3xl font-bold text-gray-900">Send Message</h1>
-            <p class="text-gray-600 mt-1">Compose a new message to another user</p>
+            <h1 class="text-3xl font-bold text-gray-900">
+                {% if property %}Send Message About "{{ property.title }}"{% else %}Send Message{% endif %}
+            </h1>
+            <p class="text-gray-600 mt-1">
+                {% if property %}
+                    You're contacting someone about this property
+                {% else %}
+                    Compose a new message to another user
+                {% endif %}
+            </p>
         </div>
 
         <!-- Form -->
@@ -17,31 +25,41 @@
             <form method="post" class="space-y-6">
                 {% csrf_token %}
 
-                <!-- Hidden fields for pre-selected receiver/property -->
-                {% if form.receiver.value %}
-                    <input type="hidden" name="receiver" value="{{ form.receiver.value|stringformat:'s' }}">
-                {% endif %}
-                {% if form.related_property.value %}
-                    <input type="hidden" name="related_property" value="{{ form.related_property.value|stringformat:'s' }}">
+                <!-- Property context (hidden) -->
+                {% if property %}
+                    <input type="hidden" name="related_property" value="{{ property.pk }}">
+                {% else %}
+                    {% if not form.related_property.value %}
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Related Property (optional)</label>
+                            {{ form.related_property }}
+                            <p class="mt-1 text-sm text-gray-500">Select a property if this message is about a specific listing</p>
+                            {% if form.related_property.errors %}
+                                <p class="mt-1 text-sm text-red-600">{{ form.related_property.errors }}</p>
+                            {% endif %}
+                        </div>
+                    {% else %}
+                        <input type="hidden" name="related_property" value="{{ form.related_property.value|stringformat:'s' }}">
+                    {% endif %}
                 {% endif %}
 
-                {% if not form.receiver.value and not form.related_property.value %}
+                <!-- Recipient selection -->
+                {% if property %}
+                    {# When property context exists, show recipient field (hidden if single choice) #}
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">Recipient</label>
+                        <label class="block text-sm font-medium text-gray-700 mb-3">Recipient</label>
                         {{ form.receiver }}
                         {% if form.receiver.errors %}
                             <p class="mt-1 text-sm text-red-600">{{ form.receiver.errors }}</p>
                         {% endif %}
                     </div>
-                {% endif %}
-
-                {% if not form.related_property.value %}
+                {% else %}
+                    {# No property context, show normal recipient field #}
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">Related Property (optional)</label>
-                        {{ form.related_property }}
-                        <p class="mt-1 text-sm text-gray-500">Select a property if this message is about a specific listing</p>
-                        {% if form.related_property.errors %}
-                            <p class="mt-1 text-sm text-red-600">{{ form.related_property.errors }}</p>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Recipient</label>
+                        {{ form.receiver }}
+                        {% if form.receiver.errors %}
+                            <p class="mt-1 text-sm text-red-600">{{ form.receiver.errors }}</p>
                         {% endif %}
                     </div>
                 {% endif %}

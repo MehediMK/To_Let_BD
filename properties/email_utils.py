@@ -60,19 +60,18 @@ def send_email_notification(subject, template_name, context, recipient_email, ex
 
 
 def send_inquiry_notification(inquiry, property_obj, extra_context=None):
-    """Send email to the selected recipient (owner or agent) about new inquiry"""
-    # Determine recipient: use inquiry.recipient if set, else fallback to property.owner
-    recipient = inquiry.recipient or property_obj.owner
-    if not recipient or not recipient.email:
+    """Send email to property owner about new inquiry"""
+    owner = property_obj.owner
+    if not owner or not owner.email:
         return False
 
     subject = f'New Inquiry for {property_obj.title}'
     context = {
-        'recipient_name': recipient.get_full_name() or recipient.username,
+        'owner_name': owner.get_full_name() or owner.username,
         'property': property_obj,
         'inquiry': inquiry,
     }
-    return send_email_notification(subject, 'inquiry_created', context, recipient.email, extra_context)
+    return send_email_notification(subject, 'inquiry_created', context, owner.email, extra_context)
 
 
 def send_inquiry_confirmation(inquiry, property_obj, extra_context=None):
