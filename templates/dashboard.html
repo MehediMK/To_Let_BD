@@ -260,7 +260,21 @@
                 </div>
             </div>
 
-            <!-- Recent Activity -->
+            <!-- Performance Trend Chart -->
+            <div class="lg:col-span-2 bg-white rounded-xl shadow p-6">
+                <h3 class="text-lg font-bold text-gray-900 mb-4">Performance Trend (30 Days)</h3>
+                {% if analytics_dates %}
+                    <div class="chart-container" style="height: 250px;">
+                        <canvas id="trendChart"></canvas>
+                    </div>
+                {% else %}
+                    <p class="text-gray-500 text-center py-8">No analytics data available yet. Analytics will appear here as your properties get views.</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Recent Activity -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
             <div class="lg:col-span-2 bg-white rounded-xl shadow p-6">
                 <h3 class="text-lg font-bold text-gray-900 mb-4">Recent Inquiries</h3>
                 {% if recent_inquiries_list %}
@@ -336,7 +350,11 @@
                                             <span class="px-2 py-1 text-xs font-medium rounded-full bg-red-100 text-red-800">Rented</span>
                                         {% endif %}
                                     </td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-gray-900 font-medium">{{ prop.views|intcomma }}</td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <a href="{% url 'property_analytics' prop.pk %}" class="text-gray-900 font-medium hover:text-blue-600 transition-colors">
+                                            {{ prop.views|intcomma }}
+                                        </a>
+                                    </td>
                                     <td class="px-6 py-4 whitespace-nowrap text-gray-900">{{ prop.inquiries.count }}</td>
                                     <td class="px-6 py-4 whitespace-nowrap">
                                         {% if prop.rating > 0 %}
@@ -388,6 +406,89 @@
                     plugins: {
                         legend: {
                             position: 'bottom',
+                        }
+                    }
+                }
+            });
+        }
+
+        // Performance Trend Chart
+        const trendCtx = document.getElementById('trendChart');
+        if (trendCtx && {{ analytics_dates|length }} > 0) {
+            const dates = {{ analytics_dates|safe }};
+            const viewsData = {{ analytics_views|safe }};
+            const savesData = {{ analytics_saves|safe }};
+            const inquiriesData = {{ analytics_inquiries|safe }};
+
+            new Chart(trendCtx, {
+                type: 'line',
+                data: {
+                    labels: dates,
+                    datasets: [
+                        {
+                            label: 'Views',
+                            data: viewsData,
+                            borderColor: '#3b82f6',
+                            backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                            fill: true,
+                            tension: 0.4,
+                            yAxisID: 'y'
+                        },
+                        {
+                            label: 'Saves',
+                            data: savesData,
+                            borderColor: '#10b981',
+                            backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                            fill: true,
+                            tension: 0.4,
+                            yAxisID: 'y'
+                        },
+                        {
+                            label: 'Inquiries',
+                            data: inquiriesData,
+                            borderColor: '#f59e0b',
+                            backgroundColor: 'rgba(245, 158, 11, 0.1)',
+                            fill: true,
+                            tension: 0.4,
+                            yAxisID: 'y'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: {
+                        mode: 'index',
+                        intersect: false,
+                    },
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return context.dataset.label + ': ' + context.parsed.y.toLocaleString();
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                precision: 0
+                            },
+                            title: {
+                                display: true,
+                                text: 'Count'
+                            }
+                        },
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Date'
+                            }
                         }
                     }
                 }

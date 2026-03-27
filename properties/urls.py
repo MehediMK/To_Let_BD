@@ -20,6 +20,7 @@ urlpatterns = [
     path('favorite/<int:pk>/', views.toggle_favorite, name='toggle_favorite'),
     path('favorites/', views.favorites_view, name='favorites'),
     path('dashboard/', views.dashboard_home, name='dashboard'),
+    path('dashboard/analytics/<int:pk>/', views.property_analytics_view, name='property_analytics'),
     path('inquiry/<int:pk>/', views.submit_inquiry, name='submit_inquiry'),
     path('my-inquiries/', views.my_inquiries_view, name='my_inquiries'),
     path('owner-inquiries/', views.owner_inquiries_view, name='owner_inquiries'),

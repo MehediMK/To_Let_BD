@@ -3,8 +3,11 @@ from django.dispatch import receiver
 from django.contrib.auth.models import User
 from django.urls import reverse
 from django.conf import settings
-from .models import UserProfile, Review, Inquiry, Notification, Favorite, Message
+from django.utils import timezone
+from datetime import date
+from .models import UserProfile, Review, Inquiry, Notification, Favorite, Message, PropertyAnalytics, PropertyVisit, Property
 from .email_utils import send_inquiry_notification, send_inquiry_confirmation, send_review_notification, send_message_notification
+from .geocoding import geocode_address
 
 @receiver(post_save, sender=User)
 def create_user_profile(sender, instance, created, **kwargs):
@@ -134,3 +137,150 @@ def message_notification(sender, instance, created, **kwargs):
             'site_url': site_url,
             'inbox_url': inbox_url,
         })
+
+
+# =====================================================
+# ANALYTICS SIGNALS
+# =====================================================
+
+@receiver(post_save, sender=PropertyVisit)
+def update_property_analytics(sender, instance, created, **kwargs):
+    """Update daily analytics when a property is visited"""
+    if created:
+        today = date.today()
+
+        # Get or create today's analytics for this property
+        analytics, created = PropertyAnalytics.objects.get_or_create(
+            property=instance.property,
+            date=today,
+            defaults={
+                'unique_visitors': 0,
+                'views': 0,
+                'saves': 0,
+                'inquiries': 0,
+            }
+        )
+
+        # Increment views
+        analytics.views += 1
+
+        # Check for unique visitor (by IP or user)
+        is_unique = False
+        if instance.user:
+            # Check if this user already visited today
+            existing_visit = PropertyVisit.objects.filter(
+                property=instance.property,
+                user=instance.user,
+                created_at__date=today
+            ).exclude(pk=instance.pk).exists()
+            if not existing_visit:
+                is_unique = True
+        elif instance.ip_address:
+            # Check if this IP already visited today
+            existing_visit = PropertyVisit.objects.filter(
+                property=instance.property,
+                ip_address=instance.ip_address,
+                created_at__date=today
+            ).exclude(pk=instance.pk).exists()
+            if not existing_visit:
+                is_unique = True
+
+        if is_unique:
+            analytics.unique_visitors += 1
+
+        analytics.save()
+
+
+@receiver(post_save, sender=Favorite)
+def update_favorite_analytics(sender, instance, created, **kwargs):
+    """Update daily analytics when a property is favorited"""
+    if created:
+        today = date.today()
+        analytics, created = PropertyAnalytics.objects.get_or_create(
+            property=instance.property,
+            date=today,
+            defaults={
+                'unique_visitors': 0,
+                'views': 0,
+                'saves': 0,
+                'inquiries': 0,
+            }
+        )
+        analytics.saves += 1
+        analytics.save()
+
+
+@receiver(post_save, sender=Inquiry)
+def update_inquiry_analytics(sender, instance, created, **kwargs):
+    """Update daily analytics when an inquiry is submitted"""
+    if created:
+        today = date.today()
+        analytics, created = PropertyAnalytics.objects.get_or_create(
+            property=instance.property,
+            date=today,
+            defaults={
+                'unique_visitors': 0,
+                'views': 0,
+                'saves': 0,
+                'inquiries': 0,
+            }
+        )
+        analytics.inquiries += 1
+        analytics.save()
+
+
+def create_missing_analytics():
+    """Create analytics entries for properties that don't have today's entry"""
+    from django.utils import timezone
+    today = date.today()
+
+    # Get all active properties
+    properties = Property.objects.filter(is_available=True)
+
+    for prop in properties:
+        PropertyAnalytics.objects.get_or_create(
+            property=prop,
+            date=today,
+            defaults={
+                'unique_visitors': 0,
+                'views': 0,
+                'saves': 0,
+                'inquiries': 0,
+            }
+        )
+
+
+@receiver(post_save, sender=Property)
+def auto_geocode_property(sender, instance, created, **kwargs):
+    """
+    Automatically geocode property when saved if coordinates are missing
+    """
+    # Skip if coordinates already exist or property has no address
+    if instance.latitude and instance.longitude:
+        return
+
+    if not instance.address and not instance.location:
+        return
+
+    # Only attempt geocoding if we have at least location
+    address = instance.address or ""
+    city = instance.city or instance.location or ""
+    country = instance.country or "Bangladesh"
+
+    try:
+        result = geocode_address(
+            address=address,
+            city=city,
+            country=country
+        )
+
+        if result:
+            # Update property with coordinates (avoid infinite loop by using update)
+            Property.objects.filter(pk=instance.pk).update(
+                latitude=result['lat'],
+                longitude=result['lon']
+            )
+            print(f"Geocoded property '{instance.title}': {result['lat']}, {result['lon']}")
+    except Exception as e:
+        # Log but don't prevent save
+        print(f"Geocoding failed for property '{instance.title}': {e}")

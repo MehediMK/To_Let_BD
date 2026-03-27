@@ -317,6 +317,8 @@ class Property(models.Model):
         ('rangpur', 'Rangpur'),
         ('mymensingh', 'Mymensingh'),
     ))
+    latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True, help_text="Latitude for map positioning")
+    longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True, help_text="Longitude for map positioning")
     district = models.CharField(max_length=100, blank=True, help_text="District (e.g., Dhaka, Chittagong)")
     thana = models.CharField(max_length=100, blank=True, help_text="Thana/Police Station (e.g., Banani, Kotwali)")
     postcode = models.CharField(max_length=10, blank=True, help_text="Postal code")
@@ -1169,3 +1171,48 @@ class WebhookEndpoint(models.Model):
 
     def __str__(self):
         return f"Webhook for {self.user.username} - {self.url[:50]}"
+
+# =====================================================
+# ANALYTICS MODELS
+# =====================================================
+
+class PropertyVisit(models.Model):
+    """Track individual property visits for detailed analytics"""
+    property = models.ForeignKey('Property', on_delete=models.CASCADE, related_name='visits')
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    user_agent = models.TextField(blank=True)
+    referrer = models.URLField(blank=True, null=True, max_length=500)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='property_visits')
+    session_key = models.CharField(max_length=40, blank=True)
+    time_on_page = models.PositiveIntegerField(null=True, blank=True, help_text="Time spent on page in seconds")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['property', 'created_at']),
+            models.Index(fields=['ip_address', 'created_at']),
+            models.Index(fields=['user', 'created_at']),
+        ]
+
+    def __str__(self):
+        return f"Visit to {self.property.title} at {self.created_at}"
+
+class SearchAnalytics(models.Model):
+    """Track search queries and results"""
+    query = models.CharField(max_length=200, blank=True)
+    filters = models.JSONField(default=dict, blank=True, help_text="Search filters applied (JSON)")
+    results_count = models.PositiveIntegerField()
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='search_analytics')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['created_at']),
+            models.Index(fields=['query']),
+        ]
+
+    def __str__(self):
+        return f"Search: '{self.query}' - {self.results_count} results"

@@ -60,7 +60,38 @@ def property_detail(request, pk):
         messages.error(request, 'This property is no longer available.')
         return redirect('home')
 
-    # Increment view count
+    # Track visit with detailed analytics
+    from .models import PropertyVisit
+    from django.utils import timezone
+
+    try:
+        # Get client IP
+        x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+        if x_forwarded_for:
+            ip = x_forwarded_for.split(',')[0].strip()
+        else:
+            ip = request.META.get('REMOTE_ADDR')
+
+        # Get user agent
+        user_agent = request.META.get('HTTP_USER_AGENT', '')
+
+        # Get referrer
+        referrer = request.META.get('HTTP_REFERER', '')
+
+        # Create visit record
+        PropertyVisit.objects.create(
+            property=property_obj,
+            ip_address=ip,
+            user_agent=user_agent,
+            referrer=referrer,
+            user=request.user if request.user.is_authenticated else None,
+            session_key=request.session.session_key or ''
+        )
+    except Exception as e:
+        # Log error but don't prevent view from rendering
+        print(f"Failed to track visit: {e}")
+
+    # Increment view count (legacy field)
     property_obj.views = getattr(property_obj, 'views', 0) + 1
     property_obj.save(update_fields=['views'] if 'views' in [f.name for f in Property._meta.fields] else [])
 
@@ -115,9 +146,61 @@ def search(request):
     sort_by = request.GET.get('sort', 'newest')  # newest, price_low, price_high, price_per_sqft_low, price_per_sqft_high, rating
     page = request.GET.get('page', 1)
 
+    # Map-based search parameters
+    map_search = request.GET.get('map_search', 'false') == 'true'
+    lat = request.GET.get('lat')
+    lng = request.GET.get('lng')
+    radius = request.GET.get('radius', '10')  # radius in km, default 10
+
     properties = Property.objects.filter(is_available=True).select_related('agent', 'owner').prefetch_related('property_amenities__amenity')
 
-    # Apply filters
+    # Map-based radius search
+    if map_search and lat and lng and radius.isdigit():
+        from django.db.models import FloatField
+        from django.db.models.functions import ACos, Cos, Radians, Sin, Sqrt
+        import math
+
+        # Haversine formula in Django ORM for distance calculation
+        # Distance = 6371 * acos(cos(radians(lat)) * cos(radians(property_lat)) * cos(radians(property_lng) - radians(lng)) + sin(radians(lat)) * sin(radians(property_lat)))
+
+        try:
+            lat_rad = math.radians(float(lat))
+            lng_rad = math.radians(float(lng))
+            radius_km = float(radius)
+
+            # Filter properties within radius using approximate bounding box first (for performance)
+            # Rough calculation: 1 degree ≈ 111 km
+            lat_delta = radius_km / 111.0
+            lng_delta = radius_km / (111.0 * math.cos(lat_rad))
+
+            properties = properties.filter(
+                latitude__isnull=False,
+                longitude__isnull=False,
+                latitude__gte=float(lat) - lat_delta,
+                latitude__lte=float(lat) + lat_delta,
+                longitude__gte=float(lng) - lng_delta,
+                longitude__lte=float(lng) + lng_delta,
+            )
+
+            # Then calculate exact distance and filter
+            properties = properties.annotate(
+                distance_km=6371 * ACos(
+                    Cos(Radians(lat)) *
+                    Cos(Radians('latitude')) *
+                    Cos(Radians('longitude') - lng_rad) +
+                    Sin(Radians(lat)) *
+                    Sin(Radians('latitude'))
+                )
+            ).filter(distance_km__lte=radius_km).order_by('distance_km')
+
+            # Annotate with distance for display
+            # Note: Keep distance_km in context
+
+        except (ValueError, TypeError):
+            # If lat/lng conversion fails, ignore map filter
+            pass
+
+    # Apply regular filters (only if not using map search as primary)
     if query:
         properties = properties.filter(
             Q(title__icontains=query) |
@@ -134,19 +217,29 @@ def search(request):
     if max_price and max_price.isdigit():
         properties = properties.filter(price__lte=max_price)
 
-    # Filter by price per square foot (annotate with calculated value)
+    # Filter by price per square foot (using F() expressions instead of .extra())
+    from django.db.models import F, FloatField, ExpressionWrapper
     if min_price_per_sqft and min_price_per_sqft.replace('.', '').isdigit():
-        properties = properties.filter(price__gt=0, square_feet__gt=0)
-        properties = properties.extra(
-            where=["price / square_feet >= %s"],
-            params=[float(min_price_per_sqft)]
-        )
+        properties = properties.filter(
+            price__gt=0,
+            square_feet__gt=0
+        ).annotate(
+            price_per_sqft=ExpressionWrapper(
+                F('price') * 1.0 / F('square_feet'),
+                output_field=FloatField()
+            )
+        ).filter(price_per_sqft__gte=float(min_price_per_sqft))
+
     if max_price_per_sqft and max_price_per_sqft.replace('.', '').isdigit():
-        properties = properties.filter(price__gt=0, square_feet__gt=0)
-        properties = properties.extra(
-            where=["price / square_feet <= %s"],
-            params=[float(max_price_per_sqft)]
-        )
+        properties = properties.filter(
+            price__gt=0,
+            square_feet__gt=0
+        ).annotate(
+            price_per_sqft=ExpressionWrapper(
+                F('price') * 1.0 / F('square_feet'),
+                output_field=FloatField()
+            )
+        ).filter(price_per_sqft__lte=float(max_price_per_sqft))
 
     if bedrooms and bedrooms.isdigit():
         properties = properties.filter(bedrooms=bedrooms)
@@ -167,17 +260,51 @@ def search(request):
     elif sort_by == 'price_high':
         properties = properties.order_by('-price')
     elif sort_by == 'price_per_sqft_low':
-        properties = properties.filter(price__gt=0, square_feet__gt=0).extra(
-            select={'price_per_sqft': 'price / square_feet'}
+        properties = properties.filter(
+            price__gt=0, square_feet__gt=0
+        ).annotate(
+            price_per_sqft=ExpressionWrapper(
+                F('price') * 1.0 / F('square_feet'),
+                output_field=FloatField()
+            )
         ).order_by('price_per_sqft')
     elif sort_by == 'price_per_sqft_high':
-        properties = properties.filter(price__gt=0, square_feet__gt=0).extra(
-            select={'price_per_sqft': 'price / square_feet'}
+        properties = properties.filter(
+            price__gt=0, square_feet__gt=0
+        ).annotate(
+            price_per_sqft=ExpressionWrapper(
+                F('price') * 1.0 / F('square_feet'),
+                output_field=FloatField()
+            )
         ).order_by('-price_per_sqft')
     elif sort_by == 'rating':
         properties = properties.order_by('-rating', '-review_count')
     else:  # newest
         properties = properties.order_by('-created_at')
+
+    # Track search analytics (only for non-map searches to avoid duplicates)
+    if not map_search:
+        try:
+            from .models import SearchAnalytics
+            ip = request.META.get('REMOTE_ADDR')
+            user = request.user if request.user.is_authenticated else None
+
+            SearchAnalytics.objects.create(
+                query=query,
+                filters={
+                    'property_type': property_type,
+                    'min_price': min_price,
+                    'max_price': max_price,
+                    'bedrooms': bedrooms,
+                    'bathrooms': bathrooms,
+                    'amenities': amenities_list,
+                },
+                results_count=properties.count(),
+                ip_address=ip,
+                user=user
+            )
+        except Exception as e:
+            print(f"Failed to track search analytics: {e}")
 
     # Pagination
     paginator = Paginator(properties, 12)  # 12 per page
@@ -200,6 +327,11 @@ def search(request):
         'total_count': paginator.count,
         'all_amenities': all_amenities,
         'selected_amenities': [int(a) for a in amenities_list if a.isdigit()],
+        # Map search parameters
+        'map_search': map_search,
+        'center_lat': lat if map_search else None,
+        'center_lng': lng if map_search else None,
+        'map_radius': radius if map_search else None,
     }
     return render(request, 'search.html', context)
 
@@ -371,9 +503,9 @@ def dashboard_home(request):
     """Owner dashboard with statistics and recent activity"""
     from django.db.models import Sum, Count, Avg, Q
     from django.utils import timezone
-    from datetime import timedelta
+    from datetime import timedelta, date
 
-    # Get user's properties with prefetched related data for performance
+    # Get user's properties
     my_properties = Property.objects.filter(owner=request.user).prefetch_related('inquiries', 'favorited_by', 'reviews')
 
     # Total statistics
@@ -390,15 +522,15 @@ def dashboard_home(request):
         property__owner=request.user,
         created_at__gte=thirty_days_ago
     ).count()
-    recent_views = Property.objects.filter(
-        owner=request.user,
-        updated_at__gte=thirty_days_ago
+    recent_favorites = Favorite.objects.filter(
+        property__owner=request.user,
+        created_at__gte=thirty_days_ago
     ).count()
 
     # Calculate average ratings
     avg_rating = my_properties.aggregate(Avg('rating'))['rating__avg'] or 0
 
-    # Top performing properties by views
+    # Top performing properties by views (last 30 days)
     top_by_views = my_properties.order_by('-views')[:5]
 
     # Top performing properties by inquiries
@@ -414,8 +546,25 @@ def dashboard_home(request):
     # Property status breakdown
     status_breakdown = my_properties.values('status').annotate(count=Count('status'))
 
-    # Monthly views trend (last 6 months) - approximate using created_at of PropertyVisit if we had that model
-    # For now, we'll show property listing dates as a placeholder
+    # Get analytics data for charts (last 30 days)
+    from .models import PropertyAnalytics
+    from django.db.models import Sum as SumDb
+
+    last_30_days = timezone.now().date() - timedelta(days=30)
+    daily_analytics = PropertyAnalytics.objects.filter(
+        property__owner=request.user,
+        date__gte=last_30_days
+    ).values('date').annotate(
+        total_views=SumDb('views'),
+        total_saves=SumDb('saves'),
+        total_inquiries=SumDb('inquiries')
+    ).order_by('date')
+
+    # Prepare data for charts
+    dates = [str(d['date']) for d in daily_analytics]
+    views_data = [d['total_views'] for d in daily_analytics]
+    saves_data = [d['total_saves'] for d in daily_analytics]
+    inquiries_data = [d['total_inquiries'] for d in daily_analytics]
 
     context = {
         'total_properties': total_properties,
@@ -425,13 +574,18 @@ def dashboard_home(request):
         'total_reviews': total_reviews,
         'total_favorites': total_favorites,
         'recent_inquiries': recent_inquiries,
-        'recent_views': recent_views,
+        'recent_favorites': recent_favorites,
         'avg_rating': round(avg_rating, 1),
         'top_by_views': top_by_views,
         'top_by_inquiries': top_by_inquiries,
         'recent_inquiries_list': recent_inquiries_list,
         'status_breakdown': status_breakdown,
-        'my_properties': my_properties,  # Add missing context variable
+        'my_properties': my_properties,
+        # Analytics chart data
+        'analytics_dates': dates,
+        'analytics_views': views_data,
+        'analytics_saves': saves_data,
+        'analytics_inquiries': inquiries_data,
     }
     return render(request, 'dashboard.html', context)
 
@@ -890,4 +1044,86 @@ def delete_message_view(request, pk):
 
     context = {'message': message}
     return render(request, 'delete_message.html', context)
+
+
+@login_required
+def property_analytics_view(request, pk):
+    """Detailed analytics for a specific property"""
+    from django.db.models import Sum, Avg, Count
+    from django.utils import timezone
+    from datetime import timedelta, date
+
+    property_obj = get_object_or_404(Property, pk=pk, owner=request.user)
+
+    # Date range for analytics (default last 30 days)
+    days = int(request.GET.get('days', 30))
+    start_date = timezone.now().date() - timedelta(days=days)
+
+    # Get daily analytics
+    daily_data = PropertyAnalytics.objects.filter(
+        property=property_obj,
+        date__gte=start_date
+    ).order_by('date')
+
+    # Prepare chart data
+    dates = [str(d.date) for d in daily_data]
+    views_data = [d.views for d in daily_data]
+    saves_data = [d.saves for d in daily_data]
+    inquiries_data = [d.inquiries for d in daily_data]
+    unique_visitors_data = [d.unique_visitors for d in daily_data]
+
+    # Summary statistics
+    total_views = sum(views_data)
+    total_saves = sum(saves_data)
+    total_inquiries = sum(inquiries_data)
+    avg_daily_views = total_views / days if days > 0 else 0
+
+    # Top referrers (from PropertyVisit)
+    from .models import PropertyVisit
+    top_referrers = PropertyVisit.objects.filter(
+        property=property_obj,
+        referrer__isnull=False
+    ).values('referrer').annotate(
+        count=Count('id')
+    ).order_by('-count')[:10]
+
+    # Recent visits (last 20)
+    recent_visits = PropertyVisit.objects.filter(
+        property=property_obj
+    ).order_by('-created_at')[:20]
+
+    # User agent breakdown
+    device_breakdown = PropertyVisit.objects.filter(
+        property=property_obj,
+        created_at__date__gte=start_date
+    ).exclude(user_agent='').values_list('user_agent', flat=True)
+
+    # Simple device categorization
+    mobile_count = sum(1 for ua in device_breakdown if 'Mobile' in ua or 'Android' in ua or 'iPhone' in ua)
+    desktop_count = sum(1 for ua in device_breakdown if not ('Mobile' in ua or 'Android' in ua or 'iPhone' in ua))
+
+    # Conversion rates
+    view_to_save_rate = (total_saves / total_views * 100) if total_views > 0 else 0
+    view_to_inquiry_rate = (total_inquiries / total_views * 100) if total_views > 0 else 0
+
+    context = {
+        'property': property_obj,
+        'dates': dates,
+        'views_data': views_data,
+        'saves_data': saves_data,
+        'inquiries_data': inquiries_data,
+        'unique_visitors_data': unique_visitors_data,
+        'total_views': total_views,
+        'total_saves': total_saves,
+        'total_inquiries': total_inquiries,
+        'avg_daily_views': round(avg_daily_views, 1),
+        'top_referrers': top_referrers,
+        'recent_visits': recent_visits,
+        'mobile_count': mobile_count,
+        'desktop_count': desktop_count,
+        'view_to_save_rate': round(view_to_save_rate, 2),
+        'view_to_inquiry_rate': round(view_to_inquiry_rate, 2),
+        'days': days,
+    }
+    return render(request, 'property_analytics.html', context)
 

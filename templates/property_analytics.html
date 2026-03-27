@@ -1,0 +1,457 @@
+{% extends "base.html" %}
+{% load static %}
+{% load bd_filters %}
+
+{% block title %}{{ property.title }} - Analytics - Rent&Stay{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.css">
+<style>
+    .stat-card {
+        background: white;
+        border-radius: 12px;
+        padding: 1.5rem;
+        box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+        transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .stat-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+    }
+    .stat-icon {
+        width: 48px;
+        height: 48px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 24px;
+    }
+    .stat-value {
+        font-size: 2rem;
+        font-weight: 700;
+    }
+    .stat-label {
+        color: #6b7280;
+        font-size: 0.875rem;
+    }
+    .chart-container {
+        position: relative;
+        height: 300px;
+        width: 100%;
+    }
+    .metric-badge {
+        display: inline-flex;
+        align-items: center;
+        padding: 0.25rem 0.75rem;
+        border-radius: 9999px;
+        font-size: 0.875rem;
+        font-weight: 500;
+    }
+    .metric-positive {
+        background-color: #d1fae5;
+        color: #065f46;
+    }
+    .metric-neutral {
+        background-color: #f3f4f6;
+        color: #374151;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-gray-50 py-8">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <!-- Header -->
+        <div class="mb-8">
+            <div class="flex items-center justify-between">
+                <div>
+                    <nav class="flex items-center space-x-2 text-sm text-gray-500 mb-2">
+                        <a href="{% url 'dashboard' %}" class="hover:text-blue-600">Dashboard</a>
+                        <span>/</span>
+                        <span class="text-gray-900">Analytics</span>
+                    </nav>
+                    <h1 class="text-3xl font-bold text-gray-900">{{ property.title }}</h1>
+                    <p class="text-gray-600 mt-1">Performance Analytics</p>
+                </div>
+                <div class="flex space-x-3">
+                    <a href="{% url 'property_detail' property.pk %}" class="px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50">
+                        View Property
+                    </a>
+                    <a href="{% url 'edit_property' property.pk %}" class="px-4 py-2 bg-blue-600 rounded-lg text-sm font-medium text-white hover:bg-blue-700">
+                        Edit Property
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Key Metrics Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <div class="stat-card">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <div class="stat-value">{{ total_views|intcomma }}</div>
+                        <div class="stat-label">Total Views</div>
+                        {% if avg_daily_views > 0 %}
+                            <div class="mt-2">
+                                <span class="metric-badge metric-positive">
+                                    Avg {{ avg_daily_views|floatformat:0 }} per day
+                                </span>
+                            </div>
+                        {% endif %}
+                    </div>
+                    <div class="stat-icon bg-blue-100 text-blue-600">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                        </svg>
+                    </div>
+                </div>
+            </div>
+
+            <div class="stat-card">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <div class="stat-value">{{ total_saves|intcomma }}</div>
+                        <div class="stat-label">Saves/Favorites</div>
+                        {% if total_views > 0 %}
+                            <div class="mt-2">
+                                <span class="metric-badge {% if view_to_save_rate > 2 %}metric-positive{% else %}metric-neutral{% endif %}">
+                                    {{ view_to_save_rate }}% conversion
+                                </span>
+                            </div>
+                        {% endif %}
+                    </div>
+                    <div class="stat-icon bg-green-100 text-green-600">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                        </svg>
+                    </div>
+                </div>
+            </div>
+
+            <div class="stat-card">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <div class="stat-value">{{ total_inquiries|intcomma }}</div>
+                        <div class="stat-label">Inquiries</div>
+                        {% if total_views > 0 %}
+                            <div class="mt-2">
+                                <span class="metric-badge {% if view_to_inquiry_rate > 1 %}metric-positive{% else %}metric-neutral{% endif %}">
+                                    {{ view_to_inquiry_rate }}% conversion
+                                </span>
+                            </div>
+                        {% endif %}
+                    </div>
+                    <div class="stat-icon bg-yellow-100 text-yellow-600">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                        </svg>
+                    </div>
+                </div>
+            </div>
+
+            <div class="stat-card">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <div class="stat-value">{{ unique_visitors_data|sum|intcomma }}</div>
+                        <div class="stat-label">Unique Visitors</div>
+                        <div class="mt-2">
+                            <span class="metric-badge metric-neutral">
+                                {{ days }} days
+                            </span>
+                        </div>
+                    </div>
+                    <div class="stat-icon bg-purple-100 text-purple-600">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                        </svg>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Chart -->
+        <div class="bg-white rounded-xl shadow p-6 mb-8">
+            <div class="flex items-center justify-between mb-6">
+                <h2 class="text-xl font-bold text-gray-900">Performance Over Time</h2>
+                <form method="get" class="flex items-center space-x-2">
+                    <label for="days" class="text-sm text-gray-600">Last:</label>
+                    <select name="days" id="days" onchange="this.form.submit()" class="border border-gray-300 rounded-lg px-3 py-1 text-sm">
+                        <option value="7" {% if days == 7 %}selected{% endif %}>7 days</option>
+                        <option value="30" {% if days == 30 %}selected{% endif %}>30 days</option>
+                        <option value="90" {% if days == 90 %}selected{% endif %}>90 days</option>
+                        <option value="180" {% if days == 180 %}selected{% endif %}>6 months</option>
+                    </select>
+                </form>
+            </div>
+
+            {% if analytics_dates %}
+                <div class="chart-container" style="height: 400px;">
+                    <canvas id="analyticsChart"></canvas>
+                </div>
+            {% else %}
+                <div class="text-center py-12 text-gray-500">
+                    <svg class="w-16 h-16 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                    </svg>
+                    <p>No analytics data available for this period.</p>
+                    <p class="text-sm mt-2">Data will appear here as visitors interact with your property.</p>
+                </div>
+            {% endif %}
+        </div>
+
+        <!-- Additional Metrics & Referrers -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+            <!-- Conversion Metrics -->
+            <div class="bg-white rounded-xl shadow p-6">
+                <h3 class="text-lg font-bold text-gray-900 mb-4">Conversion Metrics</h3>
+                <div class="space-y-4">
+                    <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                        <div>
+                            <div class="text-sm text-gray-600">View → Save Rate</div>
+                            <div class="text-2xl font-bold text-gray-900">{{ view_to_save_rate|floatformat:2 }}%</div>
+                        </div>
+                        <div class="text-green-600 text-sm font-medium">
+                            {% if view_to_save_rate > 3 %}
+                                <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fill-rule="evenodd" d="M5.293 9.707a1 1 0 010-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 01-1.414 1.414L11 7.414V15a1 1 0 11-2 0V7.414L6.707 9.707a1 1 0 01-1.414 0z" clip-rule="evenodd"/>
+                                </svg>
+                                Good
+                            {% else %}
+                                <svg class="w-5 h-5 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/>
+                                </svg>
+                                Needs work
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                        <div>
+                            <div class="text-sm text-gray-600">View → Inquiry Rate</div>
+                            <div class="text-2xl font-bold text-gray-900">{{ view_to_inquiry_rate|floatformat:2 }}%</div>
+                        </div>
+                        <div class="text-green-600 text-sm font-medium">
+                            {% if view_to_inquiry_rate > 1 %}
+                                <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fill-rule="evenodd" d="M5.293 9.707a1 1 0 010-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 01-1.414 1.414L11 7.414V15a1 1 0 11-2 0V7.414L6.707 9.707a1 1 0 01-1.414 0z" clip-rule="evenodd"/>
+                                </svg>
+                                Good
+                            {% else %}
+                                <svg class="w-5 h-5 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/>
+                                </svg>
+                                Needs work
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                        <div>
+                            <div class="text-sm text-gray-600">Mobile vs Desktop</div>
+                            <div class="text-2xl font-bold text-gray-900">{{ mobile_count }} / {{ desktop_count }}</div>
+                            <div class="text-xs text-gray-500 mt-1">{{ mobile_count + desktop_count }} tracked visits</div>
+                        </div>
+                        <div class="text-blue-600 text-sm font-medium">
+                            {% if mobile_count > desktop_count %}Mobile-first{% else %}Desktop-first{% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Top Referrers -->
+            <div class="bg-white rounded-xl shadow p-6">
+                <h3 class="text-lg font-bold text-gray-900 mb-4">Top Referrers</h3>
+                {% if top_referrers %}
+                    <div class="space-y-3">
+                        {% for ref in top_referrers %}
+                            <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                                <div class="flex-1 min-w-0">
+                                    <div class="text-sm font-medium text-gray-900 truncate">
+                                        {{ ref.referrer|urlize|safe }}
+                                    </div>
+                                    <div class="text-xs text-gray-500">{{ ref.count }} visits</div>
+                                </div>
+                                <div class="ml-4">
+                                    <div class="text-lg font-bold text-gray-900">{{ forloop.counter }}</div>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="text-center py-8 text-gray-500">
+                        <p>No referrer data available yet.</p>
+                        <p class="text-sm mt-2">Traffic sources will appear here.</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Recent Visits -->
+        <div class="bg-white rounded-xl shadow p-6">
+            <h3 class="text-lg font-bold text-gray-900 mb-4">Recent Visits</h3>
+            {% recent_visits %}
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date/Time</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Visitor</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">IP Address</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Device</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Time on Page</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        {% for visit in recent_visits %}
+                            <tr>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                    {{ visit.created_at|date:"M d, Y" }} {{ visit.created_at|time:"g:i A" }}
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                    {% if visit.user %}
+                                        {{ visit.user.username }}
+                                    {% else %}
+                                        Anonymous
+                                    {% endif %}
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                                    {{ visit.ip_address|default:"-" }}
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                                    {% if visit.user_agent %}
+                                        {% if 'Mobile' in visit.user_agent or 'Android' in visit.user_agent or 'iPhone' in visit.user_agent %}
+                                            <span class="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs">Mobile</span>
+                                        {% else %}
+                                            <span class="px-2 py-1 bg-gray-100 text-gray-700 rounded text-xs">Desktop</span>
+                                        {% endif %}
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                                    {% if visit.time_on_page %}
+                                        {{ visit.time_on_page }}s
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        {% empty %}
+                            <tr>
+                                <td colspan="5" class="px-6 py-8 text-center text-gray-500">No visits recorded yet.</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% if recent_visits %}
+                <div class="mt-4 text-center">
+                    <a href="#" class="text-blue-600 hover:underline text-sm font-medium">View All Visits (Coming Soon)</a>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Analytics Chart
+        const ctx = document.getElementById('analyticsChart');
+        if (ctx) {
+            const dates = {{ analytics_dates|safe }};
+            const viewsData = {{ analytics_views|safe }};
+            const savesData = {{ analytics_saves|safe }};
+            const inquiriesData = {{ analytics_inquiries|safe }};
+
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: dates,
+                    datasets: [
+                        {
+                            label: 'Views',
+                            data: viewsData,
+                            borderColor: '#3b82f6',
+                            backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                            fill: true,
+                            tension: 0.4,
+                            borderWidth: 2,
+                            pointRadius: 3,
+                            pointHoverRadius: 5
+                        },
+                        {
+                            label: 'Saves',
+                            data: savesData,
+                            borderColor: '#10b981',
+                            backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                            fill: true,
+                            tension: 0.4,
+                            borderWidth: 2,
+                            pointRadius: 3,
+                            pointHoverRadius: 5
+                        },
+                        {
+                            label: 'Inquiries',
+                            data: inquiriesData,
+                            borderColor: '#f59e0b',
+                            backgroundColor: 'rgba(245, 158, 11, 0.1)',
+                            fill: true,
+                            tension: 0.4,
+                            borderWidth: 2,
+                            pointRadius: 3,
+                            pointHoverRadius: 5
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: {
+                        mode: 'index',
+                        intersect: false,
+                    },
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return context.dataset.label + ': ' + context.parsed.y.toLocaleString();
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                precision: 0
+                            },
+                            title: {
+                                display: true,
+                                text: 'Count'
+                            }
+                        },
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Date'
+                            },
+                            ticks: {
+                                maxRotation: 45,
+                                minRotation: 45
+                            }
+                        }
+                    }
+                }
+            });
+        }
+    });
+</script>
+{% endblock %}

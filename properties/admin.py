@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Property, Agent, Amenity, PropertyImage, Inquiry, UserProfile, Favorite, PropertyAmenity, Review
+from .models import Property, Agent, Amenity, PropertyImage, Inquiry, UserProfile, Favorite, PropertyAmenity, Review, PropertyAnalytics, PropertyVisit, SearchAnalytics
 
 @admin.register(Agent)
 class AgentAdmin(admin.ModelAdmin):
@@ -129,3 +129,36 @@ class ReviewAdmin(admin.ModelAdmin):
     def mark_unverified(self, request, queryset):
         queryset.update(is_verified=False)
     mark_unverified.short_description = "Mark selected reviews as unverified"
+
+
+@admin.register(PropertyAnalytics)
+class PropertyAnalyticsAdmin(admin.ModelAdmin):
+    list_display = ('property', 'date', 'views', 'saves', 'inquiries', 'unique_visitors')
+    list_filter = ('date', 'property')
+    search_fields = ('property__title',)
+    readonly_fields = ('created_at', 'updated_at')
+    date_hierarchy = 'date'
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).select_related('property')
+
+
+@admin.register(PropertyVisit)
+class PropertyVisitAdmin(admin.ModelAdmin):
+    list_display = ('property', 'ip_address', 'user', 'created_at', 'time_on_page')
+    list_filter = ('created_at', 'property', 'user')
+    search_fields = ('property__title', 'ip_address', 'user_agent')
+    readonly_fields = ('created_at',)
+    date_hierarchy = 'created_at'
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).select_related('property', 'user')
+
+
+@admin.register(SearchAnalytics)
+class SearchAnalyticsAdmin(admin.ModelAdmin):
+    list_display = ('query', 'results_count', 'ip_address', 'user', 'created_at')
+    list_filter = ('created_at',)
+    search_fields = ('query', 'ip_address')
+    readonly_fields = ('created_at',)
+    date_hierarchy = 'created_at'

@@ -111,8 +111,70 @@
     </div>
 </section>
 
+<!-- Map View Toggle & Map Container -->
+<section class="py-6 bg-gray-50 border-b">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="flex items-center justify-between">
+            <div class="flex items-center space-x-4">
+                <button id="map-view-btn" class="flex items-center px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition font-medium text-gray-700 {{ map_search|yesno:'bg-blue-600 text-white border-blue-600, bg-white' }}" onclick="toggleMapView()">
+                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 01-.553-.894L15 7m0 13V7m0 0L9 7" />
+                    </svg>
+                    Map View
+                </button>
+                <button id="list-view-btn" class="flex items-center px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition font-medium text-gray-700 {{ map_search|yesno:'bg-white, text-blue-600 border-blue-600' }}" onclick="showListView()">
+                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+                    </svg>
+                    List View
+                </button>
+            </div>
+            {% if map_search %}
+                <div class="flex items-center space-x-4 text-sm text-gray-600">
+                    <span class="flex items-center">
+                        <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
+                        Radius: {{ map_radius }}km
+                    </span>
+                    <button onclick="changeRadius()" class="text-blue-600 hover:underline font-medium">Adjust</button>
+                    <button onclick="locateUser()" class="flex items-center text-blue-600 hover:underline font-medium">
+                        <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
+                        Use My Location
+                    </button>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</section>
+
+<!-- Map Container (hidden by default) -->
+<div id="map-container" class="{{ map_search|yesno:'block,hidden' }}" style="height: 500px; width: 100%; background: #e5e7eb;">
+    <div id="map" style="height: 100%; width: 100%;"></div>
+    <div class="leaflet-top leaflet-left" style="position: absolute; top: 10px; left: 10px; z-index: 1000;">
+        <div class="leaflet-control-layers leaflet-control" style="background: white; padding: 8px; border-radius: 8px; box-shadow: 0 2px 7px 1px rgba(0,0,0,0.3);">
+            <div class="leaflet-control-layers-base" style="min-width: 150px;">
+                <span style="font-weight: bold; font-size: 14px; display: block; margin-bottom: 8px;">Search Options</span>
+                <label style="display: block; margin-bottom: 6px; font-size: 13px;">
+                    <input type="range" id="radiusSlider" min="1" max="50" value="{{ map_radius|default:10 }}" onchange="updateRadius(this.value)" style="width: 100%;">
+                    <span id="radiusValue">Radius: {{ map_radius|default:10 }}km</span>
+                </label>
+                <button onclick="clearSearchArea()" style="width: 100%; padding: 6px 12px; background: #ef4444; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px; margin-top: 6px;">
+                    Clear Map Search
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<input type="hidden" id="map-active" value="{{ map_search }}">
+
 <!-- Search Results -->
-<section class="py-20 bg-white">
+<section class="py-20 {{ map_search|yesno:'hidden,' }} search-results-section">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {% if properties %}
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
@@ -242,4 +304,316 @@
         {% endif %}
     </div>
 </section>
+
+<!-- Map JavaScript -->
+{% if properties %}
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+
+<script>
+    let map = null;
+    let markers = [];
+    let searchCircle = null;
+    let centerMarker = null;
+    let currentRadius = {{ map_radius|default:10 }};
+    let searchCenter = null;
+
+    function initMap() {
+        if (map) return; // Already initialized
+
+        // Default center (Dhaka, Bangladesh if no properties, else first property)
+        let centerLat = 23.8103;
+        let centerLng = 90.4125;
+        let zoom = 10;
+
+        {% if properties %}
+            {% with first_prop=properties.0 %}
+                {% if first_prop.latitude and first_prop.longitude %}
+                    centerLat = {{ first_prop.latitude }};
+                    centerLng = {{ first_prop.longitude }};
+                    zoom = 12;
+                {% endif %}
+            {% endwith %}
+        {% endif %}
+
+        // Override with map search center if provided
+        {% if center_lat and center_lng %}
+            centerLat = {{ center_lat }};
+            centerLng = {{ center_lng }};
+            zoom = 13;
+            searchCenter = L.latLng(centerLat, centerLng);
+        {% endif %}
+
+        // Initialize map
+        map = L.map('map').setView([centerLat, centerLng], zoom);
+
+        // Add tile layer
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        }).addTo(map);
+
+        // Add search circle if center is set
+        if (searchCenter) {
+            searchCircle = L.circle(searchCenter, {
+                color: '#3b82f6',
+                fillColor: '#3b82f6',
+                fillOpacity: 0.1,
+                radius: currentRadius * 1000 // Convert km to meters
+            }).addTo(map);
+
+            centerMarker = L.marker(searchCenter, {
+                draggable: true,
+                title: 'Drag to move search center'
+            }).addTo(map);
+
+            // Update search when center moves
+            centerMarker.on('dragend', function(event) {
+                const newPos = event.target.getLatLng();
+                updateSearchCenter(newPos.lat, newPos.lng);
+            });
+
+            // Click to move center
+            map.on('click', function(e) {
+                updateSearchCenter(e.latlng.lat, e.latlng.lng);
+                if (centerMarker) {
+                    centerMarker.setLatLng(e.latlng);
+                }
+                if (searchCircle) {
+                    searchCircle.setLatLng(e.latlng);
+                }
+            });
+        }
+
+        // Add property markers
+        {% for property in properties %}
+            {% if property.latitude and property.longitude %}
+                (function() {
+                    var marker = L.marker([{{ property.latitude }}, {{ property.longitude }}]).addTo(map);
+                    var popupContent = `
+                        <div style="min-width: 200px;">
+                            <a href="{% url 'property_detail' property.pk %}" class="font-bold text-lg text-blue-600 hover:underline">
+                                {{ property.title|escapejs }}
+                            </a>
+                            <p class="text-gray-600 text-sm mb-2">{{ property.location|escapejs }}</p>
+                            <p class="font-bold text-blue-600">৳{{ property.price|floatformat:0|escapejs }}/mo</p>
+                            <p class="text-sm text-gray-500">{{ property.bedrooms }} bed • {{ property.bathrooms }} bath • {{ property.square_feet|add:", " }} sqft</p>
+                            {% if property.main_image %}
+                                <img src="{{ property.main_image.url }}" alt="{{ property.title }}" style="width: 100%; height: 100px; object-fit: cover; margin-top: 8px; border-radius: 4px;">
+                            {% endif %}
+                        </div>
+                    `;
+                    marker.bindPopup(popupContent);
+                    markers.push(marker);
+                })();
+            {% endif %}
+        {% endfor %}
+
+        // Add zoom control and fit bounds
+        if (markers.length > 0) {
+            const group = new L.featureGroup(markers);
+            map.fitBounds(group.getBounds().pad(0.1));
+        }
+    }
+
+    function updateSearchCenter(lat, lng) {
+        searchCenter = L.latLng(lat, lng);
+
+        // Update URL params (debounced)
+        const url = new URL(window.location.href);
+        url.searchParams.set('lat', lat.toFixed(6));
+        url.searchParams.set('lng', lng.toFixed(6));
+        url.searchParams.set('map_search', 'true');
+        url.searchParams.set('radius', currentRadius);
+
+        // Replace URL without reloading if possible, or reload
+        window.history.replaceState({}, '', url.toString());
+
+        // Optionally reload to re-search
+        // window.location.href = url.toString();
+    }
+
+    function changeRadius() {
+        const newRadius = prompt("Enter search radius in kilometers:", currentRadius);
+        if (newRadius && !isNaN(newRadius) && parseFloat(newRadius) > 0) {
+            currentRadius = parseFloat(newRadius);
+
+            // Update circle
+            if (searchCircle) {
+                searchCircle.setRadius(currentRadius * 1000);
+            }
+
+            // Update slider
+            const slider = document.getElementById('radiusSlider');
+            if (slider) {
+                slider.value = currentRadius;
+                document.getElementById('radiusValue').textContent = 'Radius: ' + currentRadius + 'km';
+            }
+
+            // Update URL
+            const url = new URL(window.location.href);
+            url.searchParams.set('radius', currentRadius);
+            window.location.href = url.toString();
+        }
+    }
+
+    function updateRadius(value) {
+        currentRadius = parseFloat(value);
+        document.getElementById('radiusValue').textContent = 'Radius: ' + currentRadius + 'km';
+
+        // Update circle
+        if (searchCircle) {
+            searchCircle.setRadius(currentRadius * 1000);
+        }
+
+        // Update URL
+        const url = new URL(window.location.href);
+        url.searchParams.set('radius', currentRadius);
+        window.location.href = url.toString();
+    }
+
+    function clearSearchArea() {
+        // Remove map search parameters
+        const url = new URL(window.location.href);
+        url.searchParams.delete('lat');
+        url.searchParams.delete('lng');
+        url.searchParams.delete('map_search');
+        url.searchParams.delete('radius');
+        window.location.href = url.toString();
+    }
+
+    function locateUser() {
+        if (!map) return;
+
+        if ("geolocation" in navigator) {
+            navigator.geolocation.getCurrentPosition(
+                function(position) {
+                    const lat = position.coords.latitude;
+                    const lng = position.coords.longitude;
+                    map.setView([lat, lng], 13);
+
+                    // Set as search center
+                    updateSearchCenter(lat, lng);
+                    if (centerMarker) {
+                        centerMarker.setLatLng([lat, lng]);
+                    }
+                    if (searchCircle) {
+                        searchCircle.setLatLng([lat, lng]);
+                    }
+
+                    // Reload with new center
+                    setTimeout(function() {
+                        const url = new URL(window.location.href);
+                        url.searchParams.set('lat', lat.toFixed(6));
+                        url.searchParams.set('lng', lng.toFixed(6));
+                        url.searchParams.set('map_search', 'true');
+                        url.searchParams.set('radius', currentRadius);
+                        window.location.href = url.toString();
+                    }, 500);
+                },
+                function(error) {
+                    alert("Could not get your location. Please make sure location services are enabled.");
+                }
+            );
+        } else {
+            alert("Geolocation is not supported by your browser.");
+        }
+    }
+
+    // Add marker click handler to search within radius
+    map?.on('click', function(e) {
+        if (!searchCenter || !currentRadius) return;
+        // Visual feedback
+        L.popup()
+            .setLatLng(e.latlng)
+            .setContent('Updating search to this area...')
+            .openOn(map);
+    });
+
+    function toggleMapView() {
+        const mapContainer = document.getElementById('map-container');
+        const resultsSection = document.querySelector('.search-results-section');
+        const mapBtn = document.getElementById('map-view-btn');
+        const listBtn = document.getElementById('list-view-btn');
+        const mapInput = document.getElementById('map-active');
+
+        if (mapContainer.classList.contains('hidden')) {
+            // Show map
+            mapContainer.classList.remove('hidden');
+            resultsSection.classList.add('hidden');
+            mapBtn.classList.remove('bg-white', 'text-gray-700');
+            mapBtn.classList.add('bg-blue-600', 'text-white', 'border-blue-600');
+            listBtn.classList.remove('bg-blue-600', 'text-white', 'border-blue-600');
+            listBtn.classList.add('bg-white', 'text-gray-700');
+            mapInput.value = 'true';
+
+            // Initialize map when container becomes visible
+            setTimeout(function() {
+                if (!map) {
+                    initMap();
+                } else {
+                    map.invalidateSize();
+                }
+            }, 100);
+        } else {
+            // Hide map
+            mapContainer.classList.add('hidden');
+            resultsSection.classList.remove('hidden');
+            mapBtn.classList.remove('bg-blue-600', 'text-white', 'border-blue-600');
+            mapBtn.classList.add('bg-white', 'text-gray-700');
+            listBtn.classList.remove('bg-white', 'text-gray-700');
+            listBtn.classList.add('bg-blue-600', 'text-white', 'border-blue-600');
+            mapInput.value = 'false';
+        }
+    }
+
+    function showListView() {
+        // This function forces list view (called by List View button)
+        const mapContainer = document.getElementById('map-container');
+        const resultsSection = document.querySelector('.search-resests');
+        const mapBtn = document.getElementById('map-view-btn');
+        const listBtn = document.getElementById('list-view-btn');
+        const mapInput = document.getElementById('map-active');
+
+        mapContainer.classList.add('hidden');
+        resultsSection.classList.remove('hidden');
+        mapBtn.classList.remove('bg-blue-600', 'text-white', 'border-blue-600');
+        mapBtn.classList.add('bg-white', 'text-gray-700');
+        listBtn.classList.remove('bg-white', 'text-gray-700');
+        listBtn.classList.add('bg-blue-600', 'text-white', 'border-blue-600');
+        mapInput.value = 'false';
+    }
+
+    function changeRadius() {
+        const newRadius = prompt("Enter search radius in kilometers:", "{{ map_radius|default:'10' }}");
+        if (newRadius && !isNaN(newRadius)) {
+            // Build current URL with new radius
+            const url = new URL(window.location.href);
+            url.searchParams.set('radius', newRadius);
+            url.searchParams.set('map_search', 'true');
+            if (!url.searchParams.has('lat') || !url.searchParams.has('lng')) {
+                alert('Please use the map to select a center point first.');
+                return;
+            }
+            window.location.href = url.toString();
+        }
+    }
+
+    // Initialize map on page load if map search is active
+    document.addEventListener('DOMContentLoaded', function() {
+        if ('{{ map_search }}' === 'true') {
+            setTimeout(initMap, 500);
+        }
+    });
+</script>
+
+{% if map_search %}
+<style>
+    #map-container {
+        margin-bottom: 2rem;
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    }
+</style>
+{% endif %}
 {% endblock %}
