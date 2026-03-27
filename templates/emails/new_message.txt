@@ -1,0 +1,21 @@
+Subject: New Message from {{ sender_name }}
+
+Hello {{ receiver_name }},
+
+You have received a new message on Rent&Stay.
+
+--- Message Details ---
+From: {{ sender_name }}
+{% if related_property %}Property: {{ related_property.title }}{% endif %}
+Subject: {{ subject }}
+
+Message:
+{{ body|truncatewords:50 }}
+
+Read full message: {{ inbox_url }}
+
+Best regards,
+The Rent&Stay Team
+
+---
+This is an automated email.

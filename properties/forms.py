@@ -240,6 +240,7 @@ class PropertyForm(forms.ModelForm):
             'parking_spaces',
             'main_image',
             'virtual_tour_url',
+            'virtual_tour_360',
             'floor_plan_image',
             'agent',
             'is_featured',

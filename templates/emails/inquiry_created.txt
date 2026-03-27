@@ -1,0 +1,29 @@
+Subject: New Inquiry for {{ property.title }}
+
+Hello {{ owner_name }},
+
+You have received a new inquiry for your property "{{ property.title }}".
+
+--- Inquiry Details ---
+From: {{ inquiry.name }}
+Email: {{ inquiry.email }}
+Phone: {{ inquiry.phone|default:"Not provided" }}
+Move-in Date: {{ inquiry.move_in_date|default:"Not specified" }}
+
+Message:
+{{ inquiry.message }}
+
+--- Property Details ---
+{{ property.title }}
+{{ property.location }}
+{{ property.get_property_type_display }} - {{ property.bedrooms }} bed, {{ property.bathrooms }} bath
+Price: {{ property.price }} per month
+
+You can view and respond to this inquiry in your dashboard:
+{{ owner_inquiries_url }}
+
+Best regards,
+The Rent&Stay Team
+
+---
+This is an automated email. Please do not reply directly to this message.

@@ -75,6 +75,14 @@
                 </div>
                 {% endif %}
 
+                <!-- 360° Virtual Tour -->
+                {% if property.virtual_tour_360 %}
+                <div class="mb-8">
+                    <h3 class="text-xl font-bold text-gray-900 mb-4">360° Virtual Tour</h3>
+                    <div id="panorama-{{ property.pk }}" class="rounded-xl shadow-lg overflow-hidden" style="height: 500px; width: 100%;"></div>
+                </div>
+                {% endif %}
+
                 <!-- Image Gallery -->
                 {% if property.images.all %}
                 <div class="mb-8">
@@ -368,16 +376,6 @@
                     <img src="{{ property.floor_plan_image.url }}" alt="Floor Plan" class="max-w-full h-auto border rounded-lg shadow">
                 </div>
                 {% endif %}
-
-                <!-- Virtual Tour -->
-                {% if property.virtual_tour_url %}
-                <div class="mb-8">
-                    <h2 class="text-2xl font-bold text-gray-900 mb-4">Virtual Tour</h2>
-                    <div class="aspect-video">
-                        <iframe src="{{ property.virtual_tour_url|replace:'watch?v=','embed/' }}" class="w-full h-full rounded-lg" frameborder="0" allowfullscreen></iframe>
-                    </div>
-                </div>
-                {% endif %}
             </div>
 
             <!-- Sidebar -->
@@ -498,6 +496,28 @@
         </div>
     </div>
 </div>
+
+<!-- 360 Viewer Script -->
+{% if property.virtual_tour_360 %}
+<script src="https://cdn.jsdelivr.net/npm/pannellum@2.5.6/build/pannellum.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/pannellum@2.5.6/build/pannellum.css">
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const panoramaElement = document.getElementById('panorama-{{ property.pk }}');
+    if (panoramaElement) {
+        pannellum.viewer(panoramaElement, {
+            "type": "equirectangular",
+            "panorama": "{{ property.virtual_tour_360.url }}",
+            "autoLoad": true,
+            "autoRotate": -2,
+            "compass": true,
+            "navbar": ["zoom", "fullscreen"],
+            "showControls": true
+        });
+    }
+});
+</script>
+{% endif %}
 
 <!-- Related Properties -->
 {% if related_properties %}

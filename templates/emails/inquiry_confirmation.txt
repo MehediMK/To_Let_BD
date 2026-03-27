@@ -1,0 +1,20 @@
+Subject: Your inquiry was submitted successfully
+
+Hello {{ inquirer_name }},
+
+Thank you for your inquiry about "{{ property.title }}". We have received your message and the property owner will respond to you shortly.
+
+--- Your Inquiry ---
+Property: {{ property.title }}
+Message: {{ inquiry.message|truncatewords:30 }}
+
+Expected response time: Within 24-48 hours
+
+You can track your inquiries in your dashboard:
+{{ my_inquiries_url }}
+
+Best regards,
+The Rent&Stay Team
+
+---
+This is an automated email.

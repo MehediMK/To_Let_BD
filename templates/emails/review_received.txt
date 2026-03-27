@@ -1,0 +1,20 @@
+Subject: New Review for {{ property.title }}
+
+Hello {{ owner_name }},
+
+Your property "{{ property.title }}" has received a new review.
+
+--- Review Details ---
+Reviewer: {{ review.user.username }}
+Rating: {{ review.rating }}/5 stars
+{% if review.comment %}{% firstof review.comment|truncatewords:50 "..." %}{% endif %}
+
+Your current average rating: {{ property.rating|floatformat:1 }} ({{ property.review_count }} reviews)
+
+View all reviews: {{ property_url }}
+
+Best regards,
+The Rent&Stay Team
+
+---
+This is an automated email.

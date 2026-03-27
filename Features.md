@@ -398,3 +398,26 @@
   - Admin dashboard improvements
   - User documentation/help
   - Terms of service & privacy policy
+
+
+
+
+
+ Phase 1: Immediate (High Impact, Low Effort)
+  1. Email notifications (using Django's email framework)
+  2. Bulk property management (adminactions or custom view)
+  3. Property duplication (simple copy logic)
+  4. 360° image viewer ( integrate Pannellum or Marzipano)
+
+  Phase 2: Medium Complexity
+  5. Map-based search (Leaflet.js + PostGIS or simple radius)
+  6. Saved searches with alerts
+  8. File attachments for messages
+  9. Export to PDF/CSV (using ReportLab or Django-tabular)
+
+  Phase 3: Advanced & Integrations
+  10. Energy efficiency rating (add field + UI)
+  11. Crime/safety data (API integration)
+  12. Walk score/transit score (API integration)
+  13. School district info (API integration)
+  14. Real-time notifications (WebSocket/Django Channels)

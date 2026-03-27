@@ -83,7 +83,7 @@ class PropertyAdmin(admin.ModelAdmin):
             'fields': ('bedrooms', 'bathrooms', 'square_feet', 'year_built', 'parking_spaces')
         }),
         ('Media', {
-            'fields': ('main_image', 'virtual_tour_url', 'floor_plan_image')
+            'fields': ('main_image', 'virtual_tour_url', 'virtual_tour_360', 'floor_plan_image')
         }),
         ('Relations', {
             'fields': ('agent', 'owner')

@@ -160,10 +160,12 @@ class PropertyAmenity(models.Model):
     property = models.ForeignKey('Property', on_delete=models.CASCADE, related_name='property_amenities')
     amenity = models.ForeignKey(Amenity, on_delete=models.CASCADE)
     notes = models.CharField(max_length=200, blank=True, help_text="Additional notes about this amenity")
+    order = models.IntegerField(default=0, help_text="Order for displaying amenities")
 
     class Meta:
         unique_together = ['property', 'amenity']
         verbose_name_plural = "Property Amenities"
+        ordering = ['order', 'id']
 
     def __str__(self):
         return f"{self.property.title} - {self.amenity.name}"
@@ -348,6 +350,7 @@ class Property(models.Model):
     application_fee = models.DecimalField(max_digits=8, decimal_places=2, null=True, blank=True, help_text="Application fee")
     virtual_tour_url = models.URLField(blank=True, help_text="YouTube/Vimeo/3D tour URL")
     floor_plan_image = models.ImageField(upload_to='floor_plans/', blank=True, null=True, validators=[validate_image_size])
+    virtual_tour_360 = models.ImageField(upload_to='virtual_tours_360/', blank=True, null=True, validators=[validate_image_size], help_text="360° panoramic image for immersive virtual tour")
     rating = models.FloatField(default=0.0, validators=[MinValueValidator(0.0), MaxValueValidator(5.0)])
     review_count = models.IntegerField(default=0)
     views = models.PositiveIntegerField(default=0, help_text="Number of times property has been viewed")

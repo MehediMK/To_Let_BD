@@ -1,7 +1,10 @@
 from django.db.models.signals import post_save, post_delete
 from django.dispatch import receiver
 from django.contrib.auth.models import User
-from .models import UserProfile, Review, Inquiry, Notification, Favorite
+from django.urls import reverse
+from django.conf import settings
+from .models import UserProfile, Review, Inquiry, Notification, Favorite, Message
+from .email_utils import send_inquiry_notification, send_inquiry_confirmation, send_review_notification, send_message_notification
 
 @receiver(post_save, sender=User)
 def create_user_profile(sender, instance, created, **kwargs):
@@ -46,8 +49,14 @@ def review_post_delete(sender, instance, **kwargs):
 
 @receiver(post_save, sender=Inquiry)
 def inquiry_post_save(sender, instance, created, **kwargs):
-    """When a new inquiry is created, notify the property owner"""
+    """When a new inquiry is created, notify the property owner and send emails"""
     if created and instance.property and instance.property.owner:
+        # Build URLs
+        site_url = getattr(settings, 'SITE_URL', 'http://localhost:8000')
+        owner_inquiries_url = f"{site_url}{reverse('owner_inquiries')}"
+        my_inquiries_url = f"{site_url}{reverse('my_inquiries')}"
+
+        # Create in-app notification
         Notification.objects.create(
             user=instance.property.owner,
             notification_type='inquiry',
@@ -55,12 +64,26 @@ def inquiry_post_save(sender, instance, created, **kwargs):
             message=f'You have a new inquiry from {instance.name} regarding "{instance.property.title}". Message: {instance.message[:100]}{"..." if len(instance.message) > 100 else ""}',
             related_property=instance.property
         )
+        # Send email to property owner
+        send_inquiry_notification(instance, instance.property, extra_context={
+            'site_url': site_url,
+            'owner_inquiries_url': owner_inquiries_url,
+        })
+        # Send confirmation email to inquirer
+        send_inquiry_confirmation(instance, instance.property, extra_context={
+            'site_url': site_url,
+            'my_inquiries_url': my_inquiries_url,
+        })
 
 
 @receiver(post_save, sender=Review)
 def review_notification(sender, instance, created, **kwargs):
-    """When a new review is created, notify the property owner"""
+    """When a new review is created, notify the property owner and send email"""
     if created and instance.property and instance.property.owner:
+        site_url = getattr(settings, 'SITE_URL', 'http://localhost:8000')
+        property_url = f"{site_url}{reverse('property_detail', args=[instance.property.pk])}#reviews"
+
+        # Create in-app notification
         Notification.objects.create(
             user=instance.property.owner,
             notification_type='review',
@@ -68,6 +91,13 @@ def review_notification(sender, instance, created, **kwargs):
             message=f'Your property received a new {instance.rating}-star review from {instance.user.username}.',
             related_property=instance.property
         )
+        # Send email notification
+        send_review_notification(instance, instance.property, extra_context={
+            'site_url': site_url,
+            'property_url': property_url,
+            'property': instance.property,
+            'review': instance,
+        })
 
 
 @receiver(post_save, sender=Favorite)
@@ -83,10 +113,13 @@ def favorite_notification(sender, instance, created, **kwargs):
         )
 
 
-@receiver(post_save, sender='properties.Message')
+@receiver(post_save, sender=Message)
 def message_notification(sender, instance, created, **kwargs):
-    """When a message is sent, create a notification for the receiver"""
+    """When a message is sent, create a notification for the receiver and send email"""
     if created:
+        site_url = getattr(settings, 'SITE_URL', 'http://localhost:8000')
+        inbox_url = f"{site_url}{reverse('inbox')}"
+
         # Create notification for receiver
         Notification.objects.create(
             user=instance.receiver,
@@ -95,3 +128,8 @@ def message_notification(sender, instance, created, **kwargs):
             message=f'Subject: {instance.subject}\n\n{instance.body[:100]}{"..." if len(instance.body) > 100 else ""}',
             related_property=instance.related_property
         )
+        # Send email notification to receiver
+        send_message_notification(instance, instance.receiver, extra_context={
+            'site_url': site_url,
+            'inbox_url': inbox_url,
+        })

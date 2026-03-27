@@ -266,6 +266,88 @@ def my_properties_view(request):
     context = {'properties': properties}
     return render(request, 'my_properties.html', context)
 
+
+@login_required
+def duplicate_property_view(request, pk):
+    """Duplicate an existing property (copy all data except unique fields)"""
+    original = get_object_or_404(Property, pk=pk, owner=request.user)
+
+    # Create a copy of the property
+    # Get all field values except for auto fields (id, created_at, updated_at, views, rating, review_count)
+    field_values = {}
+    for field in original._meta.fields:
+        if field.auto_created or field.name in ['id', 'created_at', 'updated_at', 'views', 'rating', 'review_count']:
+            continue
+        field_values[field.name] = getattr(original, field.name)
+
+    # Create new property with a modified title
+    field_values['title'] = f"Copy of {original.title}"
+    new_property = Property(**field_values)
+    new_property.save()
+
+    # Copy many-to-many relationships through the through model
+
+    # Copy amenities (through PropertyAmenity model)
+    old_amenities = PropertyAmenity.objects.filter(property=original)
+    for old_pa in old_amenities:
+        PropertyAmenity.objects.create(
+            property=new_property,
+            amenity=old_pa.amenity,
+            notes=old_pa.notes,
+            order=old_pa.order
+        )
+
+    # Copy gallery images (PropertyImage model)
+    old_images = PropertyImage.objects.filter(property=original)
+    for old_img in old_images:
+        # Duplicate the image file by creating a new instance
+        PropertyImage.objects.create(
+            property=new_property,
+            image=old_img.image,
+            caption=old_img.caption,
+            order=old_img.order
+        )
+
+    messages.success(request, f'Property "{original.title}" duplicated successfully! You can now edit the copy.')
+    return redirect('edit_property', pk=new_property.pk)
+
+
+@login_required
+def bulk_property_actions(request):
+    """Handle bulk actions on multiple properties"""
+    if request.method != 'POST':
+        return redirect('my_properties')
+
+    action = request.POST.get('action')
+    selected_ids = request.POST.getlist('selected_properties')
+
+    if not selected_ids:
+        messages.error(request, 'No properties selected.')
+        return redirect('my_properties')
+
+    # Get properties owned by current user
+    properties = Property.objects.filter(pk__in=selected_ids, owner=request.user)
+    count = properties.count()
+
+    if count == 0:
+        messages.error(request, 'No valid properties found.')
+        return redirect('my_properties')
+
+    if action == 'publish':
+        updated = properties.update(is_available=True)
+        messages.success(request, f'{updated} property{"es" if updated > 1 else ""} published successfully.')
+    elif action == 'unpublish':
+        updated = properties.update(is_available=False)
+        messages.success(request, f'{updated} property{"es" if updated > 1 else ""} unpublished successfully.')
+    elif action == 'delete':
+        properties.delete()
+        messages.success(request, f'{count} property{"ies" if count > 1 else "y"} deleted successfully.')
+    else:
+        messages.error(request, 'Invalid action.')
+
+    return redirect('my_properties')
+
+
 @login_required
 def dashboard_home(request):
     """Owner dashboard with statistics and recent activity"""
@@ -349,6 +431,43 @@ def edit_property_view(request, pk):
 
     context = {'form': form, 'property': property_obj}
     return render(request, 'edit_property.html', context)
+
+
+@login_required
+def bulk_property_actions(request):
+    """Handle bulk actions on multiple properties"""
+    if request.method != 'POST':
+        return redirect('my_properties')
+
+    action = request.POST.get('action')
+    selected_ids = request.POST.getlist('selected_properties')
+
+    if not selected_ids:
+        messages.error(request, 'No properties selected.')
+        return redirect('my_properties')
+
+    # Get properties owned by current user
+    properties = Property.objects.filter(pk__in=selected_ids, owner=request.user)
+    count = properties.count()
+
+    if count == 0:
+        messages.error(request, 'No valid properties found.')
+        return redirect('my_properties')
+
+    if action == 'publish':
+        updated = properties.update(is_available=True)
+        messages.success(request, f'{updated} property{"es" if updated > 1 else ""} published successfully.')
+    elif action == 'unpublish':
+        updated = properties.update(is_available=False)
+        messages.success(request, f'{updated} property{"es" if updated > 1 else ""} unpublished successfully.')
+    elif action == 'delete':
+        properties.delete()
+        messages.success(request, f'{count} property{"ies" if count > 1 else "y"} deleted successfully.')
+    else:
+        messages.error(request, 'Invalid action.')
+
+    return redirect('my_properties')
+
 
 @login_required
 def delete_property_view(request, pk):
