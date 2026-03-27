@@ -16,7 +16,7 @@
                 </a>
             </div>
             <h1 class="text-3xl md:text-4xl font-bold text-gray-900 mb-2">Inquire About Property</h1>
-            <p class="text-gray-600">Send a message to the property owner about: <strong>{{ property.title }}</strong></p>
+            <p class="text-gray-600">Send a message about: <strong>{{ property.title }}</strong></p>
 
             {% if not property.is_available %}
             <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mt-4">
@@ -74,6 +74,42 @@
                     {{ form.move_in_date }}
                 </div>
 
+                {% if form.recipient.field.queryset|length > 1 %}
+                <div class="mb-6">
+                    <label class="block text-sm font-medium text-gray-700 mb-3">Who would you like to contact?</label>
+                    <div class="space-y-3">
+                        {% for radio in form.recipient %}
+                            {% with radio_id=radio.choice_value|stringformat:"s" %}
+                                <div class="flex items-center p-3 border border-gray-200 rounded-lg hover:bg-blue-50 transition cursor-pointer {% if radio_id == form.recipient.value|stringformat:"s" %}bg-blue-50 border-blue-300{% endif %}" onclick="document.getElementById('{{ radio.id_for_input }}').click();">
+                                    {{ radio.tag }}
+                                    <label for="{{ radio.id_for_input }}" class="ml-3 flex-1 cursor-pointer">
+                                        <span class="font-medium text-gray-900">
+                                            {% if radio_id == property.owner.pk|stringformat:"s" %}
+                                                Property Owner
+                                            {% elif property.agent and radio_id == property.agent.pk|stringformat:"s" %}
+                                                {{ property.agent.name }} (Agent)
+                                            {% else %}
+                                                {{ radio.choice_label }}
+                                            {% endif %}
+                                        </span>
+                                        {% if radio_id == property.owner.pk|stringformat:"s" %}
+                                            <span class="text-xs text-gray-500 block">Property owner</span>
+                                        {% elif property.agent and radio_id == property.agent.pk|stringformat:"s" %}
+                                            <span class="text-xs text-gray-500 block">Licensed agent for this property</span>
+                                        {% endif %}
+                                    </label>
+                                </div>
+                            {% endwith %}
+                        {% endfor %}
+                    </div>
+                    {% if form.recipient.errors %}
+                        <p class="mt-1 text-sm text-red-600">{{ form.recipient.errors }}</p>
+                    {% endif %}
+                </div>
+                {% else %}
+                    {{ form.recipient }}  {# Render hidden input for single recipient #}
+                {% endif %}
+
                 <div class="mb-6">
                     <label class="block text-sm font-medium text-gray-700 mb-2">Your Message *</label>
                     {{ form.message }}
@@ -90,7 +126,7 @@
                         </svg>
                         <div class="text-sm text-blue-800">
                             <p class="font-medium mb-1">Security Notice</p>
-                            <p class="text-blue-700">Your contact information will be shared with the property owner. Only share information you're comfortable with.</p>
+                            <p class="text-blue-700">Your contact information will be shared with the person you're contacting. Only share information you're comfortable with.</p>
                         </div>
                     </div>
                 </div>

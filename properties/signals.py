@@ -49,22 +49,28 @@ def review_post_delete(sender, instance, **kwargs):
 
 @receiver(post_save, sender=Inquiry)
 def inquiry_post_save(sender, instance, created, **kwargs):
-    """When a new inquiry is created, notify the property owner and send emails"""
-    if created and instance.property and instance.property.owner:
+    """When a new inquiry is created, notify the selected recipient (owner or agent) and send emails"""
+    if created and instance.property:
+        # Determine recipient: use selected recipient if set, otherwise fall back to property owner
+        recipient_user = instance.recipient or instance.property.owner
+        if not recipient_user:
+            # No recipient available - cannot send notification
+            return
+
         # Build URLs
         site_url = getattr(settings, 'SITE_URL', 'http://localhost:8000')
         owner_inquiries_url = f"{site_url}{reverse('owner_inquiries')}"
         my_inquiries_url = f"{site_url}{reverse('my_inquiries')}"
 
-        # Create in-app notification
+        # Create in-app notification for the recipient
         Notification.objects.create(
-            user=instance.property.owner,
+            user=recipient_user,
             notification_type='inquiry',
             title=f'New Inquiry for {instance.property.title}',
             message=f'You have a new inquiry from {instance.name} regarding "{instance.property.title}". Message: {instance.message[:100]}{"..." if len(instance.message) > 100 else ""}',
             related_property=instance.property
         )
-        # Send email to property owner
+        # Send email to recipient
         send_inquiry_notification(instance, instance.property, extra_context={
             'site_url': site_url,
             'owner_inquiries_url': owner_inquiries_url,

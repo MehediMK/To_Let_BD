@@ -59,6 +59,7 @@ class Inquiry(models.Model):
     )
 
     property = models.ForeignKey('Property', on_delete=models.CASCADE, related_name='inquiries')
+    recipient = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='received_inquiries')
     name = models.CharField(max_length=200)
     email = models.EmailField()
     phone = models.CharField(max_length=20, blank=True)

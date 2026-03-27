@@ -123,7 +123,7 @@ class InquiryForm(forms.ModelForm):
 
     class Meta:
         model = Inquiry
-        fields = ['name', 'email', 'phone', 'message', 'move_in_date']
+        fields = ['name', 'email', 'phone', 'message', 'move_in_date', 'recipient']
         widgets = {
             'name': forms.TextInput(attrs={
                 'class': 'w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none',
@@ -146,7 +146,46 @@ class InquiryForm(forms.ModelForm):
                 'type': 'date',
                 'class': 'w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none'
             }),
+            'recipient': forms.RadioSelect(attrs={
+                'class': 'recipient-radio'
+            }),
         }
+
+    def __init__(self, *args, **kwargs):
+        self.property = kwargs.pop('property', None)
+        super().__init__(*args, **kwargs)
+
+        # Dynamically set recipient queryset based on property's owner and agent
+        if self.property:
+            users = []
+            # Add owner if exists
+            if self.property.owner:
+                users.append(self.property.owner)
+            # Add agent only if it exists and is different from owner
+            if self.property.agent and self.property.agent != self.property.owner:
+                users.append(self.property.agent)
+
+            if users:
+                self.fields['recipient'].queryset = User.objects.filter(pk__in=[u.pk for u in users])
+                self.fields['recipient'].empty_label = None
+                # Set field to be required always (to enforce selection)
+                self.fields['recipient'].required = True
+                # If only one recipient, use hidden widget and set default
+                if len(users) == 1:
+                    self.fields['recipient'].widget = forms.HiddenInput()
+                    self.fields['recipient'].initial = users[0]
+                else:
+                    # Multiple recipients: default to property owner
+                    self.fields['recipient'].initial = self.property.owner
+            else:
+                # No recipients available - hide the field
+                self.fields['recipient'].queryset = User.objects.none()
+                self.fields['recipient'].required = False
+                self.fields['recipient'].widget = forms.HiddenInput()
+        else:
+            # If no property provided, hide the field
+            self.fields['recipient'].queryset = User.objects.none()
+            self.fields['recipient'].required = False
 
 class UserProfileForm(forms.ModelForm):
     error_css_class = 'border-red-500'

@@ -546,13 +546,14 @@ def favorites_view(request):
 @login_required
 @rate_limit('inquiry', limit=10, period=300)  # 10 inquiries per 5 minutes
 def submit_inquiry(request, pk):
-    property_obj = get_object_or_404(Property, pk=pk)
+    property_obj = get_object_or_404(Property.objects.select_related('agent', 'owner'), pk=pk)
 
     if request.method == 'POST':
-        form = InquiryForm(request.POST)
+        form = InquiryForm(request.POST, property=property_obj)
         if form.is_valid():
             inquiry = form.save(commit=False)
             inquiry.property = property_obj
+            # The recipient is already set by the form
             inquiry.save()
             messages.success(request, 'Your inquiry has been submitted successfully! The property owner will contact you soon.')
             return redirect('property_detail', pk=pk)
@@ -564,11 +565,11 @@ def submit_inquiry(request, pk):
         }
         if hasattr(request.user, 'profile') and request.user.profile.phone:
             initial_data['phone'] = request.user.profile.phone
-        form = InquiryForm(initial=initial_data)
+        form = InquiryForm(initial=initial_data, property=property_obj)
 
     context = {
         'form': form,
-        'property': property_obj
+        'property': property_obj,
     }
     return render(request, 'submit_inquiry.html', context)
 
