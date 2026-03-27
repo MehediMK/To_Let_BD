@@ -1,4 +1,5 @@
 {% load static %}
+{% load bd_filters %}
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -6,6 +7,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Rent&Stay - Find Your Perfect Rental Home{% endblock %}</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -24,56 +26,168 @@
 <body class="bg-gray-50">
 
     <!-- Navigation -->
-    <nav class="bg-white shadow-sm sticky top-0 z-50">
+    <nav class="bg-white shadow-sm sticky top-0 z-50 transition-shadow duration-300" id="main-nav">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex justify-between items-center h-16">
                 <!-- Logo -->
                 <div class="flex items-center">
-                    <a href="/" class="flex items-center">
-                        <svg class="h-8 w-8 text-blue-600" fill="currentColor" viewBox="0 0 24 24">
+                    <a href="/" class="flex items-center hover:opacity-90 transition group">
+                        <svg class="h-8 w-8 text-blue-600 group-hover:scale-110 transition-transform duration-300" fill="currentColor" viewBox="0 0 24 24">
                             <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/>
                         </svg>
-                        <span class="ml-2 text-xl font-bold text-gray-900">Rent&Stay</span>
+                        <span class="ml-2 text-xl font-bold text-gray-900 group-hover:text-blue-600 transition-colors">Rent&Stay</span>
                     </a>
                 </div>
 
-                <!-- Desktop Menu -->
-                <div class="hidden md:flex items-center space-x-8">
-                    <a href="#" class="text-gray-700 hover:text-blue-600 font-medium transition">Buy</a>
-                    <a href="#" class="text-gray-700 hover:text-blue-600 font-medium transition">Rent</a>
-                    <a href="#" class="text-gray-700 hover:text-blue-600 font-medium transition">Sell</a>
-                    <a href="#" class="text-gray-700 hover:text-blue-600 font-medium transition">Agents</a>
+                <!-- Desktop Search Bar (Hidden on mobile) -->
+                <div class="hidden md:block flex-1 max-w-md mx-8">
+                    <form action="{% url 'search' %}" method="get" class="relative">
+                        <input type="text" name="q" placeholder="Search properties, locations..." value="{{ request.GET.q|default:'' }}"
+                               class="search-input">
+                        <svg class="h-5 w-5 text-gray-400 absolute left-3 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                        </svg>
+                    </form>
                 </div>
 
-                <!-- CTA Buttons / User Menu -->
-                <div class="flex items-center space-x-4">
+                <!-- Desktop Navigation & User Menu -->
+                <div class="hidden md:flex items-center space-x-1">
+                    <!-- Main Navigation Links -->
+                    <a href="{% url 'search' %}" class="text-gray-700 hover:text-blue-600 font-medium transition px-3 py-2 rounded-md text-sm {% if request.resolver_match.url_name == 'search' %}bg-blue-50 text-blue-600{% endif %}">Browse</a>
+
                     {% if user.is_authenticated %}
-                        <div class="hidden md:block">
-                            <a href="{% url 'profile' %}" class="text-gray-700 hover:text-blue-600 font-medium transition">
-                                {{ user.first_name|default:user.username|truncatechars:15 }}
-                            </a>
+                        <!-- Landlord/Agent specific -->
+                        {% if user.profile.is_landlord or user.is_staff %}
+                            <a href="{% url 'list_property' %}" class="text-gray-700 hover:text-blue-600 font-medium transition px-3 py-2 rounded-md text-sm">List Property</a>
+                        {% endif %}
+
+                        <!-- User Dropdown -->
+                        <div class="relative ml-3" x-data="{ open: false }">
+                            <button @click="open = !open" class="flex items-center space-x-2 p-2 rounded-md hover:bg-gray-100 transition focus:outline-none">
+                                <!-- Avatar -->
+                                {% if user.profile.avatar %}
+                                    <img src="{{ user.profile.avatar.url }}" alt="{{ user.username }}" class="h-8 w-8 rounded-full object-cover border-2 border-gray-200">
+                                {% else %}
+                                    <div class="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center border-2 border-blue-200">
+                                        <span class="text-blue-600 font-semibold text-sm">{{ user.first_name|first|default:user.username|first|upper }}</span>
+                                    </div>
+                                {% endif %}
+                                <svg class="h-4 w-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                                </svg>
+                            </button>
+
+                            <!-- Dropdown Menu -->
+                            <div x-show="open" @click.away="open = false"
+                                 class="absolute right-0 mt-2 w-64 bg-white rounded-md shadow-lg py-1 ring-1 ring-black ring-opacity-5 focus:outline-none"
+                                 style="display: none;">
+                                <!-- User Info Header -->
+                                <div class="px-4 py-3 border-b border-gray-200 bg-gray-50">
+                                    <p class="text-sm font-medium text-gray-900">{{ user.get_full_name|default:user.username }}</p>
+                                    <p class="text-xs text-gray-500 truncate">{{ user.email }}</p>
+                                    {% if user.profile.role %}
+                                        <span class="inline-block mt-1 px-2 py-0.5 text-xs font-medium bg-blue-100 text-blue-800 rounded-full">
+                                            {{ user.profile.get_role_display }}
+                                        </span>
+                                    {% endif %}
+                                </div>
+
+                                <!-- Menu Items -->
+                                <a href="{% url 'profile' %}" class="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                                    <svg class="h-4 w-4 mr-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+                                    </svg>
+                                    My Profile
+                                </a>
+                                <a href="{% url 'dashboard' %}" class="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                                    <svg class="h-4 w-4 mr-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                                    </svg>
+                                    Dashboard
+                                </a>
+                                <a href="{% url 'my_properties' %}" class="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                                    <svg class="h-4 w-4 mr-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
+                                    </svg>
+                                    My Properties
+                                </a>
+                                <a href="{% url 'favorites' %}" class="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                                    <svg class="h-4 w-4 mr-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/>
+                                    </svg>
+                                    Favorites
+                                </a>
+
+                                <!-- Messages with badge -->
+                                <a href="{% url 'inbox' %}" class="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 relative">
+                                    <svg class="h-4 w-4 mr-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/>
+                                    </svg>
+                                    Messages
+                                    {% with unread_count=user.received_messages.all|unread_count %}
+                                        {% if unread_count > 0 %}
+                                            <span class="ml-auto bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">{{ unread_count }}</span>
+                                        {% endif %}
+                                    {% endwith %}
+                                </a>
+
+                                <!-- Notifications with badge -->
+                                <a href="{% url 'notifications' %}" class="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 relative">
+                                    <svg class="h-4 w-4 mr-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
+                                    </svg>
+                                    Notifications
+                                    {% with unread_count_notif=user.notifications.all|unread_count %}
+                                        {% if unread_count_notif > 0 %}
+                                            <span class="ml-auto bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">{{ unread_count_notif }}</span>
+                                        {% endif %}
+                                    {% endwith %}
+                                </a>
+
+                                <div class="border-t border-gray-200 my-1"></div>
+
+                                <!-- Role-specific admin link -->
+                                {% if user.is_staff %}
+                                    <a href="/admin/" class="flex items-center px-4 py-2 text-sm text-red-700 hover:bg-red-50 font-medium">
+                                        <svg class="h-4 w-4 mr-3 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                        </svg>
+                                        Admin Panel
+                                    </a>
+                                {% endif %}
+
+                                {% if user.profile.is_landlord or user.profile.can_manage_properties %}
+                                    <a href="{% url 'dashboard' %}" class="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                                        <svg class="h-4 w-4 mr-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/>
+                                        </svg>
+                                        Manage Properties
+                                    </a>
+                                {% endif %}
+
+                                <div class="border-t border-gray-200 my-1"></div>
+
+                                <form method="post" action="{% url 'logout' %}">
+                                    {% csrf_token %}
+                                    <button type="submit" class="flex items-center w-full px-4 py-2 text-sm text-red-700 hover:bg-red-50 font-medium">
+                                        <svg class="h-4 w-4 mr-3 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
+                                        </svg>
+                                        Sign Out
+                                    </button>
+                                </form>
+                            </div>
                         </div>
-                        <a href="{% url 'list_property' %}" class="text-gray-700 hover:text-blue-600 font-medium transition hidden md:inline">List Property</a>
-                        <a href="{% url 'dashboard' %}" class="text-gray-700 hover:text-blue-600 font-medium transition hidden md:inline">Dashboard</a>
-                        <a href="{% url 'my_properties' %}" class="text-gray-700 hover:text-blue-600 font-medium transition hidden md:inline">My Properties</a>
-                        <a href="{% url 'favorites' %}" class="text-gray-700 hover:text-blue-600 font-medium transition hidden md:inline">Favorites</a>
-                        <a href="{% url 'notifications' %}" class="text-gray-700 hover:text-blue-600 font-medium transition hidden md:inline">
-                            Notifications
-                        </a>
-                        <a href="{% url 'inbox' %}" class="text-gray-700 hover:text-blue-600 font-medium transition hidden md:inline">Messages</a>
-                        <a href="{% url 'my_inquiries' %}" class="text-gray-700 hover:text-blue-600 font-medium transition hidden md:inline">Inquiries</a>
-                        <form method="post" action="{% url 'logout' %}" class="inline">
-                            {% csrf_token %}
-                            <button type="submit" class="text-gray-700 hover:text-red-600 font-medium transition">Logout</button>
-                        </form>
                     {% else %}
-                        <a href="{% url 'signin' %}" class="text-gray-700 hover:text-blue-600 font-medium transition">Sign In</a>
-                        <a href="{% url 'signup' %}" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition font-medium">Sign Up</a>
+                        <!-- Guest User Actions -->
+                        <a href="{% url 'signin' %}" class="text-gray-700 hover:text-blue-600 font-medium transition px-3 py-2 rounded-md text-sm">Sign In</a>
+                        <a href="{% url 'signup' %}" class="bg-blue-600 text-white px-5 py-2 rounded-lg hover:bg-blue-700 transition font-medium shadow-sm">Sign Up</a>
                     {% endif %}
                 </div>
 
                 <!-- Mobile Menu Button -->
-                <button class="md:hidden" id="mobile-menu-btn">
+                <button class="md:hidden p-2 rounded-md text-gray-700 hover:text-blue-600 hover:bg-gray-100 transition" id="mobile-menu-btn">
                     <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
                     </svg>
@@ -81,34 +195,76 @@
             </div>
         </div>
 
-        <!-- Mobile Menu -->
+        <!-- Mobile Menu (Enhanced) -->
         <div class="hidden md:hidden bg-white border-t" id="mobile-menu">
-            <div class="px-4 py-3 space-y-3">
-                <a href="#" class="block text-gray-700 hover:text-blue-600 font-medium">Buy</a>
-                <a href="#" class="block text-gray-700 hover:text-blue-600 font-medium">Rent</a>
-                <a href="#" class="block text-gray-700 hover:text-blue-600 font-medium">Sell</a>
-                <a href="#" class="block text-gray-700 hover:text-blue-600 font-medium">Agents</a>
-                <div class="border-t border-gray-200 pt-3 mt-3">
-                    {% if user.is_authenticated %}
-                        <a href="{% url 'profile' %}" class="block text-gray-700 hover:text-blue-600 font-medium">My Profile</a>
-                        <a href="{% url 'dashboard' %}" class="block text-gray-700 hover:text-blue-600 font-medium">Dashboard</a>
-                        <a href="{% url 'list_property' %}" class="block text-gray-700 hover:text-blue-600 font-medium">List Property</a>
-                        <a href="{% url 'my_properties' %}" class="block text-gray-700 hover:text-blue-600 font-medium">My Properties</a>
-                        <a href="{% url 'favorites' %}" class="block text-gray-700 hover:text-blue-600 font-medium">Favorites</a>
-                        <a href="{% url 'notifications' %}" class="block text-gray-700 hover:text-blue-600 font-medium">
-                            Notifications
+            <!-- Mobile Search -->
+            <div class="px-4 py-3 bg-gray-50">
+                <form action="{% url 'search' %}" method="get" class="relative">
+                    <input type="text" name="q" placeholder="Search properties..." value="{{ request.GET.q|default:'' }}"
+                           class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none">
+                    <svg class="h-5 w-5 text-gray-400 absolute left-3 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                    </svg>
+                </form>
+            </div>
+
+            <!-- Mobile Navigation Links -->
+            <div class="px-4 py-2">
+                <a href="{% url 'search' %}" class="block px-3 py-2 text-gray-700 hover:bg-blue-50 hover:text-blue-600 rounded-md font-medium">Browse Properties</a>
+
+                {% if user.is_authenticated %}
+                    <!-- Authenticated User Menu -->
+                    <div class="border-t border-gray-200 mt-2 pt-2">
+                        <div class="px-3 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">My Account</div>
+
+                        <a href="{% url 'profile' %}" class="block px-3 py-2 text-gray-700 hover:bg-gray-100 rounded-md">Profile</a>
+                        <a href="{% url 'dashboard' %}" class="block px-3 py-2 text-gray-700 hover:bg-gray-100 rounded-md">Dashboard</a>
+
+                        {% if user.profile.is_landlord or user.is_staff %}
+                            <a href="{% url 'list_property' %}" class="block px-3 py-2 text-gray-700 hover:bg-gray-100 rounded-md">List Property</a>
+                        {% endif %}
+
+                        <a href="{% url 'my_properties' %}" class="block px-3 py-2 text-gray-700 hover:bg-gray-100 rounded-md">My Properties</a>
+                        <a href="{% url 'favorites' %}" class="block px-3 py-2 text-gray-700 hover:bg-gray-100 rounded-md">Favorites</a>
+                        <a href="{% url 'inbox' %}" class="block px-3 py-2 text-gray-700 hover:bg-gray-100 rounded-md flex justify-between items-center">
+                            Messages
+                            {% with unread_count_msg=user.received_messages.all|unread_count %}
+                                {% if unread_count_msg > 0 %}
+                                    <span class="bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">{{ unread_count_msg }}</span>
+                                {% endif %}
+                            {% endwith %}
                         </a>
-                        <a href="{% url 'inbox' %}" class="block text-gray-700 hover:text-blue-600 font-medium">Messages</a>
-                        <a href="{% url 'my_inquiries' %}" class="block text-gray-700 hover:text-blue-600 font-medium">My Inquiries</a>
-                        <form method="post" action="{% url 'logout' %}" class="inline">
-                            {% csrf_token %}
-                            <button type="submit" class="block text-red-600 hover:text-red-700 font-medium">Logout</button>
-                        </form>
-                    {% else %}
-                        <a href="{% url 'signin' %}" class="block text-gray-700 hover:text-blue-600 font-medium">Sign In</a>
-                        <a href="{% url 'signup' %}" class="block text-blue-600 font-medium">Sign Up</a>
-                    {% endif %}
-                </div>
+                        <a href="{% url 'notifications' %}" class="block px-3 py-2 text-gray-700 hover:bg-gray-100 rounded-md flex justify-between items-center">
+                            Notifications
+                            {% with unread_count_notif=user.notifications.all|unread_count %}
+                                {% if unread_count_notif > 0 %}
+                                    <span class="bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">{{ unread_count_notif }}</span>
+                                {% endif %}
+                            {% endwith %}
+                        </a>
+                        <a href="{% url 'my_inquiries' %}" class="block px-3 py-2 text-gray-700 hover:bg-gray-100 rounded-md">My Inquiries</a>
+
+                        {% if user.is_staff %}
+                            <div class="border-t border-gray-200 mt-2 pt-2">
+                                <div class="px-3 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">Admin</div>
+                                <a href="/admin/" class="block px-3 py-2 text-red-700 hover:bg-red-50 rounded-md font-medium">Admin Panel</a>
+                            </div>
+                        {% endif %}
+
+                        <div class="border-t border-gray-200 mt-2 pt-2">
+                            <form method="post" action="{% url 'logout' %}">
+                                {% csrf_token %}
+                                <button type="submit" class="w-full text-left px-3 py-2 text-red-600 hover:bg-red-50 rounded-md font-medium">Sign Out</button>
+                            </form>
+                        </div>
+                    </div>
+                {% else %}
+                    <!-- Guest Menu -->
+                    <div class="border-t border-gray-200 mt-2 pt-2">
+                        <a href="{% url 'signin' %}" class="block px-3 py-2 text-gray-700 hover:bg-gray-100 rounded-md">Sign In</a>
+                        <a href="{% url 'signup' %}" class="block px-3 py-2 text-blue-600 hover:bg-blue-50 rounded-md font-medium">Sign Up</a>
+                    </div>
+                {% endif %}
             </div>
         </div>
     </nav>
@@ -222,6 +378,18 @@
 
     <script src="{% static 'js/main.js' %}"></script>
     <script>
+        document.addEventListener('alpine:init', () => {
+            Alpine.data('dropdown', () => ({
+                open: false,
+                toggle() {
+                    this.open = !this.open;
+                },
+                close() {
+                    this.open = false;
+                }
+            }));
+        });
+
         // Mobile menu toggle
         const mobileMenuBtn = document.getElementById('mobile-menu-btn');
         const mobileMenu = document.getElementById('mobile-menu');
@@ -229,6 +397,12 @@
         if (mobileMenuBtn && mobileMenu) {
             mobileMenuBtn.addEventListener('click', () => {
                 mobileMenu.classList.toggle('hidden');
+                // Optional: prevent body scroll when menu is open
+                if (!mobileMenu.classList.contains('hidden')) {
+                    document.body.style.overflow = 'hidden';
+                } else {
+                    document.body.style.overflow = '';
+                }
             });
 
             // Close mobile menu when clicking on a link
@@ -236,7 +410,16 @@
             mobileLinks.forEach(link => {
                 link.addEventListener('click', () => {
                     mobileMenu.classList.add('hidden');
+                    document.body.style.overflow = '';
                 });
+            });
+
+            // Close when clicking outside
+            document.addEventListener('click', (e) => {
+                if (!mobileMenu.contains(e.target) && !mobileMenuBtn.contains(e.target) && !mobileMenu.classList.contains('hidden')) {
+                    mobileMenu.classList.add('hidden');
+                    document.body.style.overflow = '';
+                }
             });
         }
 
@@ -273,6 +456,37 @@
                     this.parentElement.remove();
                 }, 500);
             });
+        });
+
+        // Add transition for dropdown menus
+        document.querySelectorAll('[x-data]').forEach(el => {
+            el.setAttribute('x-transition', '');
+        });
+
+        // Navbar scroll shadow effect
+        const nav = document.getElementById('main-nav');
+        if (nav) {
+            let lastScroll = 0;
+            window.addEventListener('scroll', () => {
+                const currentScroll = window.pageYOffset;
+                if (currentScroll > 10) {
+                    nav.classList.add('shadow-md');
+                } else {
+                    nav.classList.remove('shadow-md');
+                }
+                lastScroll = currentScroll;
+            });
+        }
+
+        // Keyboard navigation - close dropdowns on Escape
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                document.querySelectorAll('[x-data] [x-show]').forEach(el => {
+                    if (el.__x && el.__x.open !== undefined) {
+                        el.__x.open = false;
+                    }
+                });
+            }
         });
     </script>
     {% block extra_js %}{% endblock %}

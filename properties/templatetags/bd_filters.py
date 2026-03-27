@@ -99,3 +99,23 @@ def intcomma(value):
         return f"{int(value):,}"
     except (ValueError, TypeError):
         return value
+
+
+@register.filter
+def unread_count(queryset):
+    """
+    Filter a queryset to only unread items (is_read=False).
+    Works with Message and Notification models.
+
+    Usage: {{ user.received_messages.all|unread_count }}
+           {{ user.notifications.all|unread_count }}
+
+    Returns: integer count of unread items
+    """
+    if queryset is None:
+        return 0
+    try:
+        return queryset.filter(is_read=False).count()
+    except (AttributeError, TypeError):
+        # If queryset doesn't have filter method or field doesn't exist
+        return 0
