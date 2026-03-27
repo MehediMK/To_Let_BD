@@ -81,8 +81,11 @@ def property_detail(request, pk):
     # Get all amenities for this property
     amenities = property_obj.property_amenities.select_related('amenity').all()
 
-    # Get reviews
-    reviews = property_obj.reviews.select_related('user').filter(is_verified=True).order_by('-created_at')[:10]
+    # Get reviews with pagination (show all reviews)
+    reviews_list = property_obj.reviews.select_related('user').order_by('-created_at')
+    review_page = request.GET.get('review_page', 1)
+    reviews_paginator = Paginator(reviews_list, 10)
+    reviews = reviews_paginator.get_page(review_page)
 
     # Check if current user has already reviewed
     user_review = None
@@ -96,6 +99,7 @@ def property_detail(request, pk):
         'amenities': amenities,
         'reviews': reviews,
         'user_review': user_review,
+        'reviews_paginator': reviews_paginator if 'reviews_paginator' in locals() else None,
     }
     return render(request, 'property_detail.html', context)
 

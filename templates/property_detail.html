@@ -236,13 +236,27 @@
                     <!-- Reviews Section -->
                     <div class="mt-8">
                         <div class="flex justify-between items-center mb-6">
-                            <h2 class="text-2xl font-bold text-gray-900">Reviews ({{ reviews|length }})</h2>
+                            <h2 class="text-2xl font-bold text-gray-900">
+                                All Reviews ({{ reviews.paginator.count }})
+                                {% if request.user.is_authenticated and user_review %}
+                                    <span class="text-sm font-normal text-gray-500 ml-2">• You've reviewed this property</span>
+                                {% endif %}
+                            </h2>
                             {% if user.is_authenticated and not user_review %}
                                 <a href="{% url 'add_review' property.pk %}" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition text-sm font-medium">
                                     Write a Review
                                 </a>
                             {% endif %}
                         </div>
+                        <p class="text-sm text-gray-500 mb-4">
+                            Showing reviews from all guests.
+                            <span class="inline-flex items-center ml-2">
+                                <svg class="w-4 h-4 text-green-500 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                                </svg>
+                                Verified = confirmed inquiry/stay
+                            </span>
+                        </p>
 
                         {% if reviews %}
                             <div class="space-y-6">
@@ -309,9 +323,23 @@
                                 {% endfor %}
                             </div>
 
-                            {% if reviews|length >= 10 %}
-                                <div class="mt-6 text-center">
-                                    <p class="text-gray-500 text-sm">Showing latest 10 reviews. More reviews available in admin.</p>
+                            {% if reviews.paginator.num_pages > 1 %}
+                                <div class="mt-6 flex justify-center items-center space-x-2">
+                                    {% if reviews.has_previous %}
+                                        <a href="?review_page={{ reviews.previous_page_number }}" class="px-3 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 text-sm font-medium text-gray-700">
+                                            ← Previous
+                                        </a>
+                                    {% endif %}
+
+                                    <span class="text-sm text-gray-600">
+                                        Page {{ reviews.number }} of {{ reviews.paginator.num_pages }}
+                                    </span>
+
+                                    {% if reviews.has_next %}
+                                        <a href="?review_page={{ reviews.next_page_number }}" class="px-3 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 text-sm font-medium text-gray-700">
+                                            Next →
+                                        </a>
+                                    {% endif %}
                                 </div>
                             {% endif %}
                         {% else %}
@@ -328,44 +356,106 @@
                     </div>
 
                     <div>
-                        <h2 class="text-2xl font-bold text-gray-900 mb-4">Property Rules</h2>
-                            <div class="flex justify-between py-2 border-b">
-                                <span class="text-gray-600">Pets Allowed</span>
-                                <span class="font-medium {% if property.pets_allowed == 'yes' or property.pets_allowed == 'allowed' %}text-green-600{% else %}text-red-600{% endif %}">
-                                    {{ property.get_pets_allowed_display|default:"Not specified" }}
-                                </span>
+                        <h2 class="text-2xl font-bold text-gray-900 mb-4 flex items-center">
+                            <svg class="h-6 w-6 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                            </svg>
+                            Property Rules & Policies
+                        </h2>
+
+                        <!-- Policy Grid -->
+                        <div class="grid grid-cols-1 gap-4">
+                            <!-- Pets -->
+                            <div class="bg-gray-50 rounded-lg p-4">
+                                <div class="flex items-center justify-between">
+                                    <div class="flex items-center">
+                                        <svg class="h-5 w-5 mr-3 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/>
+                                        </svg>
+                                        <span class="font-medium text-gray-900">Pets</span>
+                                    </div>
+                                    <span class="inline-flex px-3 py-1 rounded-full text-sm font-medium {% if property.pets_allowed == 'yes' or property.pets_allowed == 'allowed' %}bg-green-100 text-green-800{% else %}bg-red-100 text-red-800{% endif %}">
+                                        {{ property.get_pets_allowed_display|default:"Not specified" }}
+                                    </span>
+                                </div>
                             </div>
-                            <div class="flex justify-between py-2 border-b">
-                                <span class="text-gray-600">Smoking Allowed</span>
-                                <span class="font-medium {% if property.smoking_allowed == 'yes' or property.smoking_allowed == 'allowed' %}text-green-600{% else %}text-red-600{% endif %}">
-                                    {{ property.get_smoking_allowed_display|default:"Not specified" }}
-                                </span>
+
+                            <!-- Smoking -->
+                            <div class="bg-gray-50 rounded-lg p-4">
+                                <div class="flex items-center justify-between">
+                                    <div class="flex items-center">
+                                        <svg class="h-5 w-5 mr-3 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01"/>
+                                        </svg>
+                                        <span class="font-medium text-gray-900">Smoking</span>
+                                    </div>
+                                    <span class="inline-flex px-3 py-1 rounded-full text-sm font-medium {% if property.smoking_allowed == 'yes' or property.smoking_allowed == 'allowed' %}bg-green-100 text-green-800{% else %}bg-red-100 text-red-800{% endif %}">
+                                        {{ property.get_smoking_allowed_display|default:"Not specified" }}
+                                    </span>
+                                </div>
                             </div>
-                            <div class="flex justify-between py-2 border-b">
-                                <span class="text-gray-600">Parties Allowed</span>
-                                <span class="font-medium {% if property.parties_allowed == 'yes' or property.parties_allowed == 'allowed' %}text-green-600{% else %}text-red-600{% endif %}">
-                                    {{ property.get_parties_allowed_display|default:"Not specified" }}
-                                </span>
+
+                            <!-- Parties -->
+                            <div class="bg-gray-50 rounded-lg p-4">
+                                <div class="flex items-center justify-between">
+                                    <div class="flex items-center">
+                                        <svg class="h-5 w-5 mr-3 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
+                                        </svg>
+                                        <span class="font-medium text-gray-900">Parties</span>
+                                    </div>
+                                    <span class="inline-flex px-3 py-1 rounded-full text-sm font-medium {% if property.parties_allowed == 'yes' or property.parties_allowed == 'allowed' %}bg-green-100 text-green-800{% else %}bg-red-100 text-red-800{% endif %}">
+                                        {{ property.get_parties_allowed_display|default:"Not specified" }}
+                                    </span>
+                                </div>
                             </div>
+
+                            <!-- Quiet Hours -->
                             {% if property.quiet_hours %}
-                            <div class="py-2 border-b">
-                                <span class="text-gray-600">Quiet Hours</span>
-                                <p class="font-medium mt-1">{{ property.quiet_hours }}</p>
+                            <div class="bg-gray-50 rounded-lg p-4">
+                                <div class="flex items-start">
+                                    <svg class="h-5 w-5 mr-3 mt-0.5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                    </svg>
+                                    <div class="flex-1">
+                                        <span class="font-medium text-gray-900 block mb-1">Quiet Hours</span>
+                                        <p class="text-gray-700">{{ property.quiet_hours }}</p>
+                                    </div>
+                                </div>
                             </div>
                             {% endif %}
+
+                            <!-- Lease Term -->
                             {% if property.lease_term %}
-                            <div class="py-2 border-b">
-                                <span class="text-gray-600">Lease Term</span>
-                                <p class="font-medium mt-1">{{ property.lease_term }}</p>
+                            <div class="bg-gray-50 rounded-lg p-4">
+                                <div class="flex items-start">
+                                    <svg class="h-5 w-5 mr-3 mt-0.5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                                    </svg>
+                                    <div class="flex-1">
+                                        <span class="font-medium text-gray-900 block mb-1">Lease Term</span>
+                                        <p class="text-gray-700">{{ property.lease_term }}</p>
+                                    </div>
+                                </div>
                             </div>
                             {% endif %}
+
+                            <!-- Security Deposit -->
                             {% if property.security_deposit %}
-                            <div class="py-2 border-b">
-                                <span class="text-gray-600">Security Deposit</span>
-                                <p class="font-medium mt-1">${{ property.security_deposit|floatformat:0 }}</p>
+                            <div class="bg-gray-50 rounded-lg p-4">
+                                <div class="flex items-center justify-between">
+                                    <div class="flex items-center">
+                                        <svg class="h-5 w-5 mr-3 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                        </svg>
+                                        <span class="font-medium text-gray-900">Security Deposit</span>
+                                    </div>
+                                    <span class="font-semibold text-gray-900">${{ property.security_deposit|floatformat:0|add:"," }}</span>
+                                </div>
                             </div>
                             {% endif %}
                         </div>
+                    </div>
                     </div>
                 </div>
 
@@ -390,6 +480,29 @@
                                 Application Fee: {{ property.application_fee|bdt_with_decimal }}
                             </div>
                         {% endif %}
+                    </div>
+
+                    <!-- Quick Stats -->
+                    <div class="grid grid-cols-2 gap-4 mb-6 pb-6 border-b">
+                        {% if property.rating > 0 %}
+                        <div class="text-center">
+                            <div class="flex items-center justify-center text-yellow-400 mb-1">
+                                {% for i in "12345" %}
+                                    {% if forloop.counter <= property.rating|floatformat:0|add:0 %}
+                                        <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/>
+                                        </svg>
+                                    {% endif %}
+                                {% endfor %}
+                            </div>
+                            <div class="text-sm font-semibold text-gray-900">{{ property.rating|floatformat:1 }}</div>
+                            <div class="text-xs text-gray-500">{{ property.review_count }} review{{ property.review_count|pluralize }}</div>
+                        </div>
+                        {% endif %}
+                        <div class="text-center">
+                            <div class="text-2xl font-bold text-blue-600 mb-1">{{ property.views|add:""|truncatechars:4 }}<span class="text-sm">+</span></div>
+                            <div class="text-sm text-gray-600">Views</div>
+                        </div>
                     </div>
 
                     <div class="space-y-3">
@@ -446,51 +559,143 @@
 
                 <!-- Property Info Card -->
                 <div class="bg-white rounded-xl shadow-lg p-6">
-                    <h3 class="text-lg font-bold text-gray-900 mb-4">Property Information</h3>
-                    <dl class="space-y-3">
-                        <div class="flex justify-between">
-                            <dt class="text-gray-600">Property ID</dt>
-                            <dd class="font-medium text-gray-900">#{{ property.pk }}</dd>
+                    <h3 class="text-lg font-bold text-gray-900 mb-4 flex items-center">
+                        <svg class="h-5 w-5 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                        Property Information
+                    </h3>
+
+                    <!-- Basic Details -->
+                    <div class="space-y-3 mb-6 pb-6 border-b">
+                        <div class="flex justify-between items-center">
+                            <span class="text-gray-600 text-sm">Property Type</span>
+                            <span class="font-semibold text-gray-900">{{ property.get_property_type_display }}</span>
                         </div>
-                        <div class="flex justify-between">
-                            <dt class="text-gray-600">Property Type</dt>
-                            <dd class="font-medium text-gray-900">{{ property.get_property_type_display }}</dd>
+                        <div class="flex justify-between items-center">
+                            <span class="text-gray-600 text-sm">Bedrooms</span>
+                            <span class="font-semibold text-gray-900">{{ property.bedrooms }}</span>
                         </div>
-                        <div class="flex justify-between">
-                            <dt class="text-gray-600">Bedrooms</dt>
-                            <dd class="font-medium text-gray-900">{{ property.bedrooms }}</dd>
+                        <div class="flex justify-between items-center">
+                            <span class="text-gray-600 text-sm">Bathrooms</span>
+                            <span class="font-semibold text-gray-900">{{ property.bathrooms }}</span>
                         </div>
-                        <div class="flex justify-between">
-                            <dt class="text-gray-600">Bathrooms</dt>
-                            <dd class="font-medium text-gray-900">{{ property.bathrooms }}</dd>
-                        </div>
-                        <div class="flex justify-between">
-                            <dt class="text-gray-600">Square Feet</dt>
-                            <dd class="font-medium text-gray-900">{{ property.square_feet|add:"," }}</dd>
+                        <div class="flex justify-between items-center">
+                            <span class="text-gray-600 text-sm">Area</span>
+                            <span class="font-semibold text-gray-900">{{ property.square_feet|add:"," }} sq ft</span>
                         </div>
                         {% if property.get_price_per_sqft %}
-                        <div class="flex justify-between">
-                            <dt class="text-gray-600">Price/Sqft</dt>
-                            <dd class="font-medium text-green-600">${{ property.get_price_per_sqft|floatformat:2 }}</dd>
+                        <div class="flex justify-between items-center">
+                            <span class="text-gray-600 text-sm">Price/Sqft</span>
+                            <span class="font-semibold text-green-600">${{ property.get_price_per_sqft|floatformat:2 }}</span>
                         </div>
                         {% endif %}
-                        {% if property.parking_spaces %}
-                        <div class="flex justify-between">
-                            <dt class="text-gray-600">Parking</dt>
-                            <dd class="font-medium text-gray-900">{{ property.parking_spaces }} space{{ property.parking_spaces|pluralize }}</dd>
+                    </div>
+
+                    <!-- Property Details -->
+                    <div class="space-y-3 mb-6 pb-6 border-b">
+                        <h4 class="text-sm font-bold text-gray-900 uppercase tracking-wide mb-2">Details</h4>
+                        {% if property.year_built %}
+                        <div class="flex justify-between items-center">
+                            <span class="text-gray-600 text-sm">Year Built</span>
+                            <span class="font-medium text-gray-900">{{ property.year_built }}</span>
                         </div>
                         {% endif %}
-                        <div class="flex justify-between">
-                            <dt class="text-gray-600">Listed</dt>
-                            <dd class="font-medium text-gray-900">{{ property.created_at|date:"M d, Y" }}</dd>
+                        {% if property.parking_spaces and property.parking_spaces > 0 %}
+                        <div class="flex justify-between items-center">
+                            <span class="text-gray-600 text-sm">Parking</span>
+                            <span class="font-medium text-gray-900">{{ property.parking_spaces }} space{{ property.parking_spaces|pluralize }}</span>
                         </div>
-                        <div class="flex justify-between">
-                            <dt class="text-gray-600">Status</dt>
-                            <dd class="font-medium {% if property.is_available %}text-green-600{% else %}text-red-600{% endif %}">
+                        {% endif %}
+                        {% if property.security_deposit %}
+                        <div class="flex justify-between items-center">
+                            <span class="text-gray-600 text-sm">Security Deposit</span>
+                            <span class="font-medium text-gray-900">${{ property.security_deposit|floatformat:0|add:"," }}</span>
+                        </div>
+                        {% endif %}
+                        {% if property.application_fee %}
+                        <div class="flex justify-between items-center">
+                            <span class="text-gray-600 text-sm">Application Fee</span>
+                            <span class="font-medium text-gray-900">${{ property.application_fee|floatformat:0|add:"," }}</span>
+                        </div>
+                        {% endif %}
+                        {% if property.lease_term %}
+                        <div class="flex justify-between items-center">
+                            <span class="text-gray-600 text-sm">Lease Term</span>
+                            <span class="font-medium text-gray-900">{{ property.lease_term }}</span>
+                        </div>
+                        {% endif %}
+                    </div>
+
+                    <!-- Property Status -->
+                    <div class="space-y-3 mb-6 pb-6 border-b">
+                        <h4 class="text-sm font-bold text-gray-900 uppercase tracking-wide mb-2">Status</h4>
+                        <div class="flex justify-between items-center">
+                            <span class="text-gray-600 text-sm">Listed Date</span>
+                            <span class="font-medium text-gray-900">{{ property.created_at|date:"M d, Y" }}</span>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span class="text-gray-600 text-sm">Last Updated</span>
+                            <span class="font-medium text-gray-900">{{ property.updated_at|date:"M d, Y" }}</span>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span class="text-gray-600 text-sm">Views</span>
+                            <span class="font-medium text-gray-900">{{ property.views|add:"," }}</span>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span class="text-gray-600 text-sm">Status</span>
+                            <span class="inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium {% if property.is_available %}bg-green-100 text-green-800{% else %}bg-red-100 text-red-800{% endif %}">
                                 {{ property.get_status_display }}
-                            </dd>
+                            </span>
                         </div>
-                    </dl>
+                        {% if property.featured_tag %}
+                        <div class="flex justify-between items-center">
+                            <span class="text-gray-600 text-sm">Featured</span>
+                            <span class="inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium {{ property.get_featured_tag_color|cut:'bg-'|cut:'-600'|add:'bg-'|add:'-100' }} text-{{ property.get_featured_tag_color|cut:'bg-'|cut:'-600' }}">
+                                {{ property.get_featured_tag_display }}
+                            </span>
+                        </div>
+                        {% endif %}
+                    </div>
+
+                    <!-- Location -->
+                    <div class="space-y-3">
+                        <h4 class="text-sm font-bold text-gray-900 uppercase tracking-wide mb-2">Location</h4>
+                        <div class="flex justify-between items-center">
+                            <span class="text-gray-600 text-sm">Area</span>
+                            <span class="font-medium text-gray-900">{{ property.location }}</span>
+                        </div>
+                        {% if property.address %}
+                        <div class="flex justify-between items-center">
+                            <span class="text-gray-600 text-sm">Address</span>
+                            <span class="font-medium text-gray-900 text-right max-w-[60%]">{{ property.address }}</span>
+                        </div>
+                        {% endif %}
+                        {% if property.division %}
+                        <div class="flex justify-between items-center">
+                            <span class="text-gray-600 text-sm">Division</span>
+                            <span class="font-medium text-gray-900">{{ property.get_division_display }}</span>
+                        </div>
+                        {% endif %}
+                        {% if property.district %}
+                        <div class="flex justify-between items-center">
+                            <span class="text-gray-600 text-sm">District</span>
+                            <span class="font-medium text-gray-900">{{ property.district }}</span>
+                        </div>
+                        {% endif %}
+                        {% if property.city %}
+                        <div class="flex justify-between items-center">
+                            <span class="text-gray-600 text-sm">City</span>
+                            <span class="font-medium text-gray-900">{{ property.city }}</span>
+                        </div>
+                        {% endif %}
+                        {% if property.postcode %}
+                        <div class="flex justify-between items-center">
+                            <span class="text-gray-600 text-sm">Postcode</span>
+                            <span class="font-medium text-gray-900">{{ property.postcode }}</span>
+                        </div>
+                        {% endif %}
+                    </div>
                 </div>
             </div>
         </div>
