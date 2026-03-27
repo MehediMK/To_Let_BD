@@ -23,7 +23,8 @@ def save_user_profile(sender, instance, **kwargs):
 def update_property_rating(review_instance):
     """Update property's average rating and review count"""
     property_obj = review_instance.property
-    reviews = property_obj.reviews.filter(is_verified=True)  # Only count verified reviews? Or all?
+    # Count all reviews, not just verified ones
+    reviews = property_obj.reviews.all()
     count = reviews.count()
     if count > 0:
         total = sum(r.rating for r in reviews)
