@@ -7,7 +7,7 @@ from django.contrib import messages
 from django.http import JsonResponse, HttpResponse
 from django.utils import timezone
 from django.contrib.auth.models import User
-from .models import Property, Amenity, PropertyImage, Inquiry, Favorite, PropertyAmenity, UserProfile, Review, Message
+from .models import Property, Amenity, PropertyImage, Inquiry, Favorite, PropertyAmenity, UserProfile, Review, Message, Notification, PushNotification
 from .forms import SignUpForm, SignInForm, PropertyForm, PropertyImageForm, InquiryForm, UserProfileForm, ReviewForm, MessageForm
 from .rate_limit import rate_limit
 from .email_verification import send_verification_email, verify_email_token
@@ -40,11 +40,25 @@ def home(request):
     return render(request, 'index.html', context)
 
 def property_detail(request, pk):
+    # Get property without is_available filter initially
     property_obj = get_object_or_404(
         Property.objects.select_related('agent', 'owner'),
-        pk=pk,
-        is_available=True
+        pk=pk
     )
+
+    # Check if user has permission to view this property
+    can_view = property_obj.is_available
+    if request.user.is_authenticated:
+        # Owner can always view
+        if request.user == property_obj.owner:
+            can_view = True
+        # User with inquiry can view
+        elif Inquiry.objects.filter(property=property_obj, email=request.user.email).exists():
+            can_view = True
+
+    if not can_view:
+        messages.error(request, 'This property is no longer available.')
+        return redirect('home')
 
     # Increment view count
     property_obj.views = getattr(property_obj, 'views', 0) + 1
@@ -355,8 +369,8 @@ def dashboard_home(request):
     from django.utils import timezone
     from datetime import timedelta
 
-    # Get user's properties
-    my_properties = Property.objects.filter(owner=request.user)
+    # Get user's properties with prefetched related data for performance
+    my_properties = Property.objects.filter(owner=request.user).prefetch_related('inquiries', 'favorited_by', 'reviews')
 
     # Total statistics
     total_properties = my_properties.count()
@@ -413,6 +427,7 @@ def dashboard_home(request):
         'top_by_inquiries': top_by_inquiries,
         'recent_inquiries_list': recent_inquiries_list,
         'status_breakdown': status_breakdown,
+        'my_properties': my_properties,  # Add missing context variable
     }
     return render(request, 'dashboard.html', context)
 
@@ -431,42 +446,6 @@ def edit_property_view(request, pk):
 
     context = {'form': form, 'property': property_obj}
     return render(request, 'edit_property.html', context)
-
-
-@login_required
-def bulk_property_actions(request):
-    """Handle bulk actions on multiple properties"""
-    if request.method != 'POST':
-        return redirect('my_properties')
-
-    action = request.POST.get('action')
-    selected_ids = request.POST.getlist('selected_properties')
-
-    if not selected_ids:
-        messages.error(request, 'No properties selected.')
-        return redirect('my_properties')
-
-    # Get properties owned by current user
-    properties = Property.objects.filter(pk__in=selected_ids, owner=request.user)
-    count = properties.count()
-
-    if count == 0:
-        messages.error(request, 'No valid properties found.')
-        return redirect('my_properties')
-
-    if action == 'publish':
-        updated = properties.update(is_available=True)
-        messages.success(request, f'{updated} property{"es" if updated > 1 else ""} published successfully.')
-    elif action == 'unpublish':
-        updated = properties.update(is_available=False)
-        messages.success(request, f'{updated} property{"es" if updated > 1 else ""} unpublished successfully.')
-    elif action == 'delete':
-        properties.delete()
-        messages.success(request, f'{count} property{"ies" if count > 1 else "y"} deleted successfully.')
-    else:
-        messages.error(request, 'Invalid action.')
-
-    return redirect('my_properties')
 
 
 @login_required
@@ -563,7 +542,7 @@ def favorites_view(request):
 @login_required
 @rate_limit('inquiry', limit=10, period=300)  # 10 inquiries per 5 minutes
 def submit_inquiry(request, pk):
-    property_obj = get_object_or_404(Property, pk=pk, is_available=True)
+    property_obj = get_object_or_404(Property, pk=pk)
 
     if request.method == 'POST':
         form = InquiryForm(request.POST)
@@ -600,7 +579,12 @@ def my_inquiries_view(request):
 def owner_inquiries_view(request):
     """View inquiries for properties owned by current user"""
     # Get all inquiries for properties owned by this user
-    inquiries = Inquiry.objects.filter(property__owner=request.user).select_related('property').order_by('-created_at')
+    inquiries_list = Inquiry.objects.filter(property__owner=request.user).select_related('property').order_by('-created_at')
+
+    # Pagination
+    page = request.GET.get('page', 1)
+    paginator = Paginator(inquiries_list, 15)  # 15 per page
+    inquiries = paginator.get_page(page)
 
     # Handle status update via POST
     if request.method == 'POST':
