@@ -472,87 +472,135 @@
             <div class="lg:col-span-1">
                 <!-- Contact Card -->
                 <div class="bg-white rounded-xl shadow-lg p-6 sticky top-24 mb-6">
-                    <div class="text-center mb-6">
-                        <div class="text-3xl font-bold text-blue-600 mb-2">{{ property.price|bdt }}</div>
-                        <div class="text-gray-500">per month</div>
-                        {% if property.application_fee %}
-                            <div class="mt-2 text-sm text-gray-600">
-                                Application Fee: {{ property.application_fee|bdt_with_decimal }}
-                            </div>
-                        {% endif %}
-                    </div>
-
-                    <!-- Quick Stats -->
-                    <div class="grid grid-cols-2 gap-4 mb-6 pb-6 border-b">
+                    <!-- Price & Stats Row -->
+                    <div class="flex items-center justify-between mb-6 pb-6 border-b">
+                        <div>
+                            <div class="text-2xl font-bold text-blue-600">{{ property.price|bdt }}</div>
+                            <div class="text-xs text-gray-500">per month</div>
+                        </div>
                         {% if property.rating > 0 %}
-                        <div class="text-center">
-                            <div class="flex items-center justify-center text-yellow-400 mb-1">
+                        <div class="text-right">
+                            <div class="flex items-center justify-end space-x-1 mb-1">
                                 {% for i in "12345" %}
                                     {% if forloop.counter <= property.rating|floatformat:0|add:0 %}
-                                        <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                        <svg class="w-4 h-4 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
                                             <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/>
                                         </svg>
                                     {% endif %}
                                 {% endfor %}
                             </div>
-                            <div class="text-sm font-semibold text-gray-900">{{ property.rating|floatformat:1 }}</div>
-                            <div class="text-xs text-gray-500">{{ property.review_count }} review{{ property.review_count|pluralize }}</div>
+                            <div class="text-sm font-semibold">{{ property.rating|floatformat:1 }}</div>
                         </div>
                         {% endif %}
-                        <div class="text-center">
-                            <div class="text-2xl font-bold text-blue-600 mb-1">{{ property.views|add:""|truncatechars:4 }}<span class="text-sm">+</span></div>
-                            <div class="text-sm text-gray-600">Views</div>
-                        </div>
                     </div>
 
-                    <div class="space-y-3">
-                        <a href="{% url 'submit_inquiry' property.pk %}" class="w-full bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition font-medium text-center block">
-                            Contact Owner
+                    <!-- Action Buttons - Compact Grid -->
+                    <div class="grid grid-cols-2 gap-2 mb-4">
+                        <a href="{% url 'submit_inquiry' property.pk %}" class="bg-blue-600 text-white px-4 py-3 rounded-lg hover:bg-blue-700 transition font-semibold text-center flex items-center justify-center">
+                            <svg class="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                            </svg>
+                            Contact
                         </a>
 
                         <form method="post" action="{% url 'toggle_favorite' property.pk %}" class="inline-block w-full">
                             {% csrf_token %}
-                            <button type="submit" class="w-full {% if is_favorited %}bg-red-600 text-white{% else %}bg-white border border-gray-300 text-gray-700{% endif %} px-6 py-3 rounded-lg hover:{% if is_favorited %}bg-red-700{% else %}bg-gray-50{% endif %} transition font-medium flex items-center justify-center">
-                                <svg class="h-5 w-5 mr-2" fill="{% if is_favorited %}currentColor{% else %}none{% endif %}" stroke="currentColor" viewBox="0 0 24 24">
+                            <button type="submit" class="w-full {% if is_favorited %}bg-red-500 text-white{% else %}bg-white border border-gray-300 text-gray-700{% endif %} px-4 py-3 rounded-lg hover:{% if is_favorited %}bg-red-600{% else %}bg-gray-50{% endif %} transition font-semibold flex items-center justify-center">
+                                <svg class="h-4 w-4 mr-2" fill="{% if is_favorited %}currentColor{% else %}none{% endif %}" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/>
                                 </svg>
-                                {% if is_favorited %}Remove Favorite{% else %}Add to Favorites{% endif %}
+                                {{ is_favorited|yesno:'Favorited,Favorite' }}
                             </button>
                         </form>
+                    </div>
 
-                        <a href="{% url 'home' %}" class="w-full bg-white border border-gray-300 text-gray-700 px-6 py-3 rounded-lg hover:bg-gray-50 transition font-medium text-center block">
-                            Share Property
+                    <!-- Secondary Action -->
+                    <div class="grid grid-cols-2 gap-2">
+                        <button onclick="shareProperty()" class="bg-green-600 text-white px-4 py-3 rounded-lg hover:bg-green-700 transition font-semibold text-center flex items-center justify-center">
+                            <svg class="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"/>
+                            </svg>
+                            Share
+                        </button>
+
+                        <a href="{% url 'home' %}" class="bg-gray-100 text-gray-700 px-4 py-3 rounded-lg hover:bg-gray-200 transition font-semibold text-center flex items-center justify-center">
+                            <svg class="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                            </svg>
+                            Details
                         </a>
                     </div>
 
+                    <!-- Share functionality -->
+                    <script>
+                    function shareProperty() {
+                        if (navigator.share) {
+                            navigator.share({
+                                title: '{{ property.title }}',
+                                text: 'Check out this property: {{ property.title }} - {{ property.price|bdt }}/month',
+                                url: window.location.href
+                            })
+                        } else {
+                            // Fallback: copy to clipboard
+                            navigator.clipboard.writeText(window.location.href).then(() => {
+                                alert('Link copied to clipboard!');
+                            });
+                        }
+                    }
+                    </script>
+
                     {% if property.agent %}
                     <div class="mt-6 pt-6 border-t">
-                        <h3 class="text-lg font-bold text-gray-900 mb-3">Contact Agent</h3>
-                        <div class="flex items-center mb-4">
-                            {% if property.agent.photo %}
-                                <img src="{{ property.agent.photo.url }}" alt="{{ property.agent.name }}" class="h-16 w-16 rounded-full mr-4 object-cover">
-                            {% else %}
-                                <div class="h-16 w-16 rounded-full bg-gray-300 mr-4 flex items-center justify-center">
-                                    <span class="text-gray-600">No Photo</span>
-                                </div>
-                            {% endif %}
-                            <div>
-                                <div class="font-bold text-gray-900">{{ property.agent.name }}</div>
-                                {% if property.agent.bio %}
-                                    <p class="text-sm text-gray-600">{{ property.agent.bio|truncatewords:10 }}</p>
+                        <h3 class="text-sm font-bold text-gray-900 uppercase tracking-wide mb-4">Contact Agent</h3>
+
+                        <!-- Agent Card -->
+                        <div class="bg-gray-50 rounded-lg p-4">
+                            <div class="flex items-center mb-4">
+                                {% if property.agent.photo %}
+                                    <img src="{{ property.agent.photo.url }}" alt="{{ property.agent.name }}" class="h-14 w-14 rounded-full object-cover mr-3 border-2 border-white shadow">
+                                {% else %}
+                                    <div class="h-14 w-14 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 mr-3 border-2 border-white shadow flex items-center justify-center">
+                                        <span class="text-white font-bold text-lg">{{ property.agent.name|first|upper }}</span>
+                                    </div>
                                 {% endif %}
+                                <div class="flex-1 min-w-0">
+                                    <div class="font-bold text-gray-900 text-sm truncate">{{ property.agent.name }}</div>
+                                    {% if property.agent.bio %}
+                                        <p class="text-xs text-gray-600 truncate">{{ property.agent.bio }}</p>
+                                    {% else %}
+                                        <p class="text-xs text-gray-500">Property Agent</p>
+                                    {% endif %}
+                                </div>
+                            </div>
+
+                            <!-- Contact Actions -->
+                            <div class="space-y-2">
+                                {% if property.agent.phone %}
+                                    <a href="tel:{{ property.agent.phone }}" class="flex items-center w-full bg-white border border-gray-200 hover:bg-blue-50 hover:border-blue-300 transition rounded-lg px-3 py-2.5 group">
+                                        <svg class="h-4 w-4 text-green-600 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/>
+                                        </svg>
+                                        <span class="text-sm font-medium text-gray-700 group-hover:text-blue-600 truncate">{{ property.agent.phone|phone_bd }}</span>
+                                    </a>
+                                {% endif %}
+
+                                {% if property.agent.email %}
+                                    <a href="mailto:{{ property.agent.email }}" class="flex items-center w-full bg-white border border-gray-200 hover:bg-blue-50 hover:border-blue-300 transition rounded-lg px-3 py-2.5 group">
+                                        <svg class="h-4 w-4 text-blue-600 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                                        </svg>
+                                        <span class="text-sm font-medium text-gray-700 group-hover:text-blue-600 truncate">{{ property.agent.email }}</span>
+                                    </a>
+                                {% endif %}
+
+                                <a href="{% url 'submit_inquiry' property.pk %}" class="flex items-center w-full bg-blue-600 text-white hover:bg-blue-700 transition rounded-lg px-3 py-2.5 mt-2">
+                                    <svg class="h-4 w-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>
+                                    </svg>
+                                    <span class="text-sm font-bold">Send Message</span>
+                                </a>
                             </div>
                         </div>
-                        {% if property.agent.email %}
-                            <a href="mailto:{{ property.agent.email }}" class="text-blue-600 hover:underline text-sm block mb-1">
-                                {{ property.agent.email }}
-                            </a>
-                        {% endif %}
-                        {% if property.agent.phone %}
-                            <a href="tel:{{ property.agent.phone }}" class="text-blue-600 hover:underline text-sm block">
-                                {{ property.agent.phone|phone_bd }}
-                            </a>
-                        {% endif %}
                     </div>
                     {% endif %}
                 </div>
