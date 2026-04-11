@@ -569,7 +569,7 @@
     function showListView() {
         // This function forces list view (called by List View button)
         const mapContainer = document.getElementById('map-container');
-        const resultsSection = document.querySelector('.search-resests');
+        const resultsSection = document.querySelector('.search-results-section');
         const mapBtn = document.getElementById('map-view-btn');
         const listBtn = document.getElementById('list-view-btn');
         const mapInput = document.getElementById('map-active');
@@ -605,6 +605,7 @@
         }
     });
 </script>
+{% endif %}
 
 {% if map_search %}
 <style>
